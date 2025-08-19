@@ -270,7 +270,7 @@
                                 </td>
                                 <td>
                                     {% if log.records_processed %}
-                                        {{ log.records_processed | number_format }}
+                                        {{ "{:,}".format(log.records_processed) }}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -282,7 +282,7 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ log.started_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
                                     {% if log.error_message %}
                                         <button class="btn btn-sm btn-outline-danger" 
@@ -443,6 +443,9 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     
     fetch(`/cases/{{ case.case_uuid }}/upload`, {
         method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
         body: formData
     })
     .then(response => response.json())

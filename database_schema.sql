@@ -345,6 +345,42 @@ CREATE TABLE mounts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ARP Table Raw
+CREATE TABLE arp_table_raw (
+    id SERIAL PRIMARY KEY,
+    address VARCHAR(45),
+    hwtype VARCHAR(20),
+    hwaddress VARCHAR(17),
+    flags VARCHAR(10),
+    mask VARCHAR(45),
+    iface VARCHAR(50),
+    timestamp DOUBLE PRECISION,
+    extractor VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Fdisk Information
+CREATE TABLE fdisk (
+    id SERIAL PRIMARY KEY,
+    disk_path VARCHAR(200),
+    disk_size VARCHAR(50),
+    disk_model VARCHAR(100),
+    sector_size VARCHAR(50),
+    disklabel_type VARCHAR(20),
+    disk_identifier VARCHAR(50),
+    device VARCHAR(200),
+    boot_flag BOOLEAN,
+    start_sector BIGINT,
+    end_sector BIGINT,
+    sectors BIGINT,
+    size VARCHAR(20),
+    partition_id VARCHAR(10),
+    partition_type VARCHAR(50),
+    timestamp DOUBLE PRECISION,
+    extractor VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- DPKG Packages
 CREATE TABLE dpkg_packages (
     id SERIAL PRIMARY KEY,

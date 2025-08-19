@@ -7,6 +7,7 @@ from sqlalchemy import text, inspect
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import db
 from app.models import IngestionLog, Case
+from app.field_filters import filter_record_fields, get_allowed_fields, parse_raw_stdout_data, requires_raw_data_parsing
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,7 @@ class JSONIngestionProcessor:
             'environmentVariables': 'environment_variables',
             # New artifact types
             'arpCache': 'arp_cache',
+            'arpTableRaw': 'arp_table_raw',
             'blockDevices': 'block_devices',
             'boot': 'boot_info',
             'browsingHistory_data': 'browsing_history',
@@ -42,7 +44,11 @@ class JSONIngestionProcessor:
             'collection_metadata': 'collection_metadata',
             'connectionTracking': 'connection_tracking',
             'cpuInformation': 'cpu_information',
-            'criticalFiles': 'critical_files'
+            'criticalFiles': 'critical_files',
+            'disk_usage': 'disk_usage',
+            'fdisk': 'fdisk_info',
+            'filesystemStats': 'filesystem_stats',
+            'filesystemTypes': 'filesystem_types'
         }
     
     def process_file(self, file_path: str, case_uuid: str, filename: str) -> Tuple[bool, str, Dict[str, Any]]:
@@ -156,6 +162,10 @@ class JSONIngestionProcessor:
             return 'cronJobs'
         elif 'system' in filename_lower and 'log' in filename_lower:
             return 'systemLogs'
+        elif 'filesystemstats' in filename_lower:
+            return 'filesystemStats'
+        elif 'filesystemtypes' in filename_lower:
+            return 'filesystemTypes'
         elif 'filesystem' in filename_lower or 'file_system' in filename_lower:
             return 'fileSystem'
         elif 'interface' in filename_lower:
@@ -181,6 +191,12 @@ class JSONIngestionProcessor:
             return 'cpuInformation'
         elif 'criticalfiles' in filename_lower or 'critical_files' in filename_lower:
             return 'criticalFiles'
+        elif 'arptableraw' in filename_lower or 'arp_table_raw' in filename_lower:
+            return 'arpTableRaw'
+        elif 'disk_usage' in filename_lower or 'diskusage' in filename_lower:
+            return 'disk_usage'
+        elif 'fdisk' in filename_lower:
+            return 'fdisk'
         
         # Try to determine from data structure
         if isinstance(data, dict):
@@ -220,9 +236,10 @@ class JSONIngestionProcessor:
                 return self._process_collection_summary(data, schema_name, table_name, stats)
             elif artifact_type == 'firewallRules':
                 return self._process_firewall_rules(data, schema_name, table_name, stats)
-            elif artifact_type in ['arpCache', 'blockDevices', 'boot', 'browsingHistory_data', 
+            elif artifact_type in ['arpCache', 'arpTableRaw', 'blockDevices', 'boot', 'browsingHistory_data', 
                                  'btmp_logs', 'cifsMounts', 'collection_metadata', 
-                                 'connectionTracking', 'cpuInformation', 'criticalFiles']:
+                                 'connectionTracking', 'cpuInformation', 'criticalFiles',
+                                 'disk_usage', 'fdisk', 'filesystemStats', 'filesystemTypes']:
                 return self._process_structured_data(data, schema_name, table_name, stats, artifact_type)
             else:
                 return self._process_list_data(data, schema_name, table_name, stats)
@@ -238,20 +255,12 @@ class JSONIngestionProcessor:
         Process collection summary data.
         """
         try:
-            collection_info = data.get('collection_info', {})
-            statistics = data.get('statistics', {})
+            # Apply field filtering for collection_metadata
+            filtered_data = filter_record_fields(data, 'collection_metadata')
             
-            record = {
-                'collection_timestamp': collection_info.get('timestamp'),
-                'hostname': collection_info.get('hostname'),
-                'collection_directory': collection_info.get('directory'),
-                'total_sections': statistics.get('total_sections', 0),
-                'total_files': statistics.get('total_files', 0),
-                'total_directories': statistics.get('total_directories', 0),
-                'sections': json.dumps(data.get('sections', [])),
-                'created_files': json.dumps(data.get('created_files', [])),
-                'created_at': datetime.utcnow()
-            }
+            # Prepare the record for insertion
+            record = self._prepare_record_for_insertion(filtered_data, 'collection_metadata')
+            record['created_at'] = datetime.utcnow()
             
             success = self._insert_record(schema_name, table_name, record)
             if success:
@@ -272,9 +281,13 @@ class JSONIngestionProcessor:
         Process structured data for various artifact types.
         """
         try:
+            # Check if this artifact type requires raw data parsing
+            if requires_raw_data_parsing(artifact_type):
+                return self._process_raw_data(data, schema_name, table_name, stats, artifact_type)
+            
             if isinstance(data, dict):
                 # Handle dictionary-based artifacts
-                record = self._prepare_record_for_insertion(data)
+                record = self._prepare_record_for_insertion(data, artifact_type)
                 record['created_at'] = datetime.utcnow()
                 record['artifact_type'] = artifact_type
                 
@@ -312,54 +325,71 @@ class JSONIngestionProcessor:
             stats['errors'] = 1
             return False, f"Error processing {artifact_type}: {str(e)}", stats
     
+    def _process_raw_data(self, data: Any, schema_name: str, table_name: str, 
+                         stats: Dict, artifact_type: str) -> Tuple[bool, str, Dict]:
+        """
+        Process raw stdout data by parsing it into structured records.
+        """
+        try:
+            # Extract stdout content from the data
+            stdout_content = None
+            if isinstance(data, dict):
+                stdout_content = data.get('stdout', '')
+            elif isinstance(data, str):
+                stdout_content = data
+            
+            if not stdout_content:
+                stats['errors'] = 1
+                return False, f"No stdout content found for {artifact_type}", stats
+            
+            # Parse the raw stdout data
+            parsed_records = parse_raw_stdout_data(stdout_content, artifact_type)
+            
+            if not parsed_records:
+                stats['total_records'] = 0
+                stats['inserted_records'] = 0
+                return True, f"No parseable data found in {artifact_type}", stats
+            
+            stats['total_records'] = len(parsed_records)
+            records_inserted = 0
+            
+            # Insert each parsed record
+            for record in parsed_records:
+                # Apply field filtering
+                filtered_record = filter_record_fields(record, artifact_type)
+                
+                # Prepare record for insertion
+                prepared_record = self._prepare_record_for_insertion(filtered_record, artifact_type)
+                prepared_record['created_at'] = datetime.utcnow()
+                prepared_record['artifact_type'] = artifact_type
+                
+                if self._insert_record(schema_name, table_name, prepared_record):
+                    records_inserted += 1
+                else:
+                    stats['errors'] += 1
+            
+            stats['inserted_records'] = records_inserted
+            
+            if records_inserted > 0:
+                return True, f"Processed {records_inserted}/{len(parsed_records)} records for {artifact_type}", stats
+            else:
+                return False, f"Failed to insert any records for {artifact_type}", stats
+                
+        except Exception as e:
+            stats['errors'] = 1
+            return False, f"Error processing raw data for {artifact_type}: {str(e)}", stats
+    
     def _process_firewall_rules(self, data: Dict, schema_name: str, 
                               table_name: str, stats: Dict) -> Tuple[bool, str, Dict]:
         """
         Process firewall rules data.
         """
         try:
-            records_inserted = 0
-            total_records = 0
+            # Apply field filtering for firewall rules
+            filtered_data = filter_record_fields(data, 'firewallRules')
             
-            # Process iptables
-            if 'iptables' in data:
-                iptables_data = data['iptables']
-                record = {
-                    'rule_type': 'iptables',
-                    'command': iptables_data.get('command'),
-                    'success': iptables_data.get('success', False),
-                    'return_code': iptables_data.get('return_code'),
-                    'stdout': iptables_data.get('stdout'),
-                    'stderr': iptables_data.get('stderr'),
-                    'created_at': datetime.utcnow()
-                }
-                
-                if self._insert_record(schema_name, table_name, record):
-                    records_inserted += 1
-                total_records += 1
-            
-            # Process ip6tables
-            if 'ip6tables' in data:
-                ip6tables_data = data['ip6tables']
-                record = {
-                    'rule_type': 'ip6tables',
-                    'command': ip6tables_data.get('command'),
-                    'success': ip6tables_data.get('success', False),
-                    'return_code': ip6tables_data.get('return_code'),
-                    'stdout': ip6tables_data.get('stdout'),
-                    'stderr': ip6tables_data.get('stderr'),
-                    'created_at': datetime.utcnow()
-                }
-                
-                if self._insert_record(schema_name, table_name, record):
-                    records_inserted += 1
-                total_records += 1
-            
-            stats['total_records'] = total_records
-            stats['inserted_records'] = records_inserted
-            stats['errors'] = total_records - records_inserted
-            
-            return True, f"Processed {records_inserted}/{total_records} firewall rules", stats
+            # Process the filtered data as structured data
+            return self._process_structured_data(filtered_data, schema_name, table_name, stats, 'firewallRules')
             
         except Exception as e:
             return False, f"Error processing firewall rules: {str(e)}", stats
@@ -383,7 +413,7 @@ class JSONIngestionProcessor:
                         item['created_at'] = datetime.utcnow()
                     
                     # Convert any nested objects to JSON strings
-                    processed_item = self._prepare_record_for_insertion(item)
+                    processed_item = self._prepare_record_for_insertion(item, table_name)
                     
                     if self._insert_record(schema_name, table_name, processed_item):
                         records_inserted += 1
@@ -400,10 +430,14 @@ class JSONIngestionProcessor:
         except Exception as e:
             return False, f"Error processing list data: {str(e)}", stats
     
-    def _prepare_record_for_insertion(self, record: Dict) -> Dict:
+    def _prepare_record_for_insertion(self, record: Dict, artifact_type: str = None) -> Dict:
         """
-        Prepare a record for database insertion by handling data types.
+        Prepare a record for database insertion by handling data types and applying field filtering.
         """
+        # Apply field filtering first if artifact_type is provided
+        if artifact_type:
+            record = filter_record_fields(record, artifact_type)
+        
         prepared = {}
         
         for key, value in record.items():

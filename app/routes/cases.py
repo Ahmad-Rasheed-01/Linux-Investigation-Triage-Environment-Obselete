@@ -245,16 +245,38 @@ def view_case(case_id):
             row_count = get_table_row_count(case.schema_name, table)
             table_stats[table] = row_count
         
-        # Get recent ingestion logs for this case
-        recent_logs = IngestionLog.query.filter_by(case_id=case_uuid).order_by(
+        # Get recent ingestion logs
+        recent_logs = IngestionLog.query.filter_by(case_id=case.id).order_by(
             IngestionLog.started_at.desc()
         ).limit(10).all()
+        
+        # Debug logging
+        import sys
+        print(f"DEBUG: Case ID: {case.id}, Case UUID: {case.case_uuid}")
+        sys.stdout.flush()
+        print(f"DEBUG: Recent logs count: {len(recent_logs)}")
+        sys.stdout.flush()
+        print(f"DEBUG: All logs query: IngestionLog.query.filter_by(case_id={case.id}).all()")
+        all_logs_debug = IngestionLog.query.filter_by(case_id=case.id).all()
+        print(f"DEBUG: All logs count: {len(all_logs_debug)}")
+        sys.stdout.flush()
+        for log in recent_logs:
+            print(f"DEBUG: Log: {log.filename}, Status: {log.status}, Case ID: {log.case_id}")
+            sys.stdout.flush()
+        
+        # Also check if there are any logs with different case_id format
+        all_logs_in_db = IngestionLog.query.all()
+        print(f"DEBUG: Total logs in database: {len(all_logs_in_db)}")
+        sys.stdout.flush()
+        for log in all_logs_in_db[:5]:  # Show first 5
+            print(f"DEBUG: DB Log: {log.filename}, Case ID: {log.case_id}, Status: {log.status}")
+            sys.stdout.flush()
         
         # Calculate case statistics
         total_records = sum(table_stats.values())
         
         # Calculate ingestion statistics
-        all_logs = IngestionLog.query.filter_by(case_id=case_uuid).all()
+        all_logs = IngestionLog.query.filter_by(case_id=case.id).all()
         successful_ingestions = len([log for log in all_logs if log.status == 'completed'])
         failed_ingestions = len([log for log in all_logs if log.status == 'failed'])
         total_files = len(all_logs)
@@ -273,7 +295,7 @@ def view_case(case_id):
                              case=case,
                              table_stats=table_stats,
                              total_records=total_records,
-                             recent_logs=recent_logs,
+                             ingestion_logs=recent_logs,
                              stats=stats)
         
     except Exception as e:
@@ -388,14 +410,23 @@ def delete_case(case_id):
 def upload_artifacts(case_id):
     """Upload JSON artifact files to a case"""
     case_uuid = UUID(case_id)
-    case = Case.query.get_or_404(case_uuid)
+    case = Case.query.filter_by(case_uuid=case_uuid).first_or_404()
     
     if request.method == 'GET':
         return render_template('cases/upload.html', case=case)
     
+    # Check if this is an AJAX request (fetch API doesn't set X-Requested-With by default)
+    # We'll detect AJAX by checking if the request expects JSON or has specific headers
+    is_ajax = (request.headers.get('Accept', '').find('application/json') != -1 or 
+               request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+               'fetch' in request.headers.get('User-Agent', '').lower())
+    
     try:
         if 'files' not in request.files:
-            flash('No files selected', 'error')
+            error_msg = 'No files selected'
+            if is_ajax:
+                return jsonify({'success': False, 'error': error_msg}), 400
+            flash(error_msg, 'error')
             return redirect(request.url)
         
         files = request.files.getlist('files')
@@ -426,17 +457,34 @@ def upload_artifacts(case_id):
                 })
         
         if not uploaded_files:
-            flash('No valid JSON files uploaded', 'error')
+            error_msg = 'No valid JSON files uploaded'
+            if is_ajax:
+                return jsonify({'success': False, 'error': error_msg}), 400
+            flash(error_msg, 'error')
             return redirect(request.url)
         
         # Start ingestion process for uploaded files
         for file_info in uploaded_files:
-            start_ingestion_task(case_id, file_info['path'], file_info['filename'], file_info['size'])
+            start_ingestion_task(case.id, file_info['path'], file_info['filename'], file_info['size'])
         
-        flash(f'Successfully uploaded {len(uploaded_files)} files. Ingestion started.', 'success')
+        success_msg = f'Successfully uploaded {len(uploaded_files)} files. Ingestion started.'
+        
+        if is_ajax:
+            return jsonify({
+                'success': True, 
+                'message': success_msg,
+                'uploaded_count': len(uploaded_files)
+            })
+        
+        flash(success_msg, 'success')
         return redirect(url_for('cases.view_case', case_id=case_id))
         
     except Exception as e:
         current_app.logger.error(f"Error uploading artifacts for case {case_id}: {e}")
+        error_msg = f'Error uploading files: {str(e)}'
+        
+        if is_ajax:
+            return jsonify({'success': False, 'error': error_msg}), 500
+        
         flash('Error uploading files', 'error')
         return redirect(url_for('cases.upload_artifacts', case_id=case_id))
