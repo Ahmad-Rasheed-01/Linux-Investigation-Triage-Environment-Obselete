@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - LITE{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Internal Server Error
+                    </h4>
+                </div>
+                <div class="card-body text-center">
+                    <h1 class="display-1 text-danger">500</h1>
+                    <h3 class="mb-3">Something went wrong!</h3>
+                    <p class="lead mb-4">
+                        We're experiencing some technical difficulties. Our team has been notified and is working to resolve the issue.
+                    </p>
+                    
+                    <div class="mb-4">
+                        <a href="{{ url_for('main.index') }}" class="btn btn-primary me-2">
+                            <i class="fas fa-home"></i> Return to Dashboard
+                        </a>
+                        <a href="javascript:history.back()" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Go Back
+                        </a>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>Need help?</strong> 
+                        If this problem persists, please contact the system administrator.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

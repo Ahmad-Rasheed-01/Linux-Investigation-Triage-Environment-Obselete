@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block title %}Cases - LITE{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="fas fa-folder-open me-2"></i>Investigation Cases
+    </h1>
+    <a href="{{ url_for('cases.create_case') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>New Case
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="active" {{ 'selected' if request.args.get('status') == 'active' }}>Active</option>
+                    <option value="inactive" {{ 'selected' if request.args.get('status') == 'inactive' }}>Inactive</option>
+                    <option value="closed" {{ 'selected' if request.args.get('status') == 'closed' }}>Closed</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="priority" class="form-label">Priority</label>
+                <select class="form-select" id="priority" name="priority">
+                    <option value="">All Priorities</option>
+                    <option value="high" {{ 'selected' if request.args.get('priority') == 'high' }}>High</option>
+                    <option value="medium" {{ 'selected' if request.args.get('priority') == 'medium' }}>Medium</option>
+                    <option value="low" {{ 'selected' if request.args.get('priority') == 'low' }}>Low</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       placeholder="Search case name or description..." 
+                       value="{{ request.args.get('search', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search me-1"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Cases Table -->
+{% if cases.items %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-list me-2"></i>Cases ({{ cases.total }} total)
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="casesTable">
+                <thead>
+                    <tr>
+                        <th>Case Name</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Investigator</th>
+                        <th>Created</th>
+                        <th>Updated</th>
+                        <th>Files</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for case in cases.items %}
+                    <tr>
+                        <td>
+                            <div>
+                                <a href="{{ url_for('cases.view_case', case_id=case.id) }}" 
+                                   class="text-decoration-none fw-bold">
+                                    {{ case.case_name }}
+                                </a>
+                                {% if case.case_description %}
+                                <br><small class="text-muted">{{ case.case_description[:100] }}{% if case.case_description|length > 100 %}...{% endif %}</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-{{ case.status }}">
+                                {{ case.status.title() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if case.case_priority == 'high' %}
+                                <span class="badge bg-danger">High</span>
+                            {% elif case.case_priority == 'medium' %}
+                                <span class="badge bg-warning text-dark">Medium</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Low</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ case.investigator_name or 'Not assigned' }}</td>
+                        <td>
+                            <span title="{{ case.created_at.strftime('%Y-%m-%d %H:%M:%S') }}">
+                                {{ case.created_at.strftime('%Y-%m-%d') }}
+                            </span>
+                        </td>
+                        <td>
+                            <span title="{{ case.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}">
+                                {{ case.updated_at.strftime('%Y-%m-%d') }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ case.total_files or 0 }}</span>
+                            {% if case.total_file_size %}
+                            <br><small class="text-muted">{{ "%.1f MB"|format(case.total_file_size) }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('cases.view_case', case_id=case.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="View Case">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('analysis.case_analysis', case_id=case.id) }}" 
+                                   class="btn btn-sm btn-outline-success" title="Analyze">
+                                    <i class="fas fa-chart-bar"></i>
+                                </a>
+                                <a href="{{ url_for('cases.edit_case', case_id=case.id) }}" 
+                                   class="btn btn-sm btn-outline-warning" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                            data-bs-toggle="dropdown" title="More Actions">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        {% if case.status == 'active' %}
+                                        <li>
+                                            <a class="dropdown-item" href="#" 
+                                               onclick="updateCaseStatus({{ case.id }}, 'inactive')">
+                                                <i class="fas fa-pause me-2"></i>Deactivate
+                                            </a>
+                                        </li>
+                                        {% elif case.status == 'inactive' %}
+                                        <li>
+                                            <a class="dropdown-item" href="#" 
+                                               onclick="updateCaseStatus({{ case.id }}, 'active')">
+                                                <i class="fas fa-play me-2"></i>Activate
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        {% if case.status != 'closed' %}
+                                        <li>
+                                            <a class="dropdown-item" href="#" 
+                                               onclick="updateCaseStatus({{ case.id }}, 'closed')">
+                                                <i class="fas fa-lock me-2"></i>Close Case
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="#" 
+                                               onclick="deleteCase({{ case.id }}, '{{ case.case_name }}')">
+                                                <i class="fas fa-trash me-2"></i>Delete
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if cases.pages > 1 %}
+<nav aria-label="Cases pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if cases.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('cases.list_cases', page=cases.prev_num, **request.args) }}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        
+        {% for page_num in cases.iter_pages() %}
+            {% if page_num %}
+                {% if page_num != cases.page %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('cases.list_cases', page=page_num, **request.args) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% endif %}
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+        {% endfor %}
+        
+        {% if cases.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('cases.list_cases', page=cases.next_num, **request.args) }}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="fas fa-folder-open fa-4x text-muted mb-4"></i>
+        <h4 class="text-muted">No Cases Found</h4>
+        <p class="text-muted mb-4">
+            {% if request.args.get('search') or request.args.get('status') or request.args.get('priority') %}
+                No cases match your current filters. Try adjusting your search criteria.
+            {% else %}
+                You haven't created any investigation cases yet.
+            {% endif %}
+        </p>
+        <a href="{{ url_for('cases.create_case') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Create Your First Case
+        </a>
+        {% if request.args.get('search') or request.args.get('status') or request.args.get('priority') %}
+        <a href="{{ url_for('cases.list_cases') }}" class="btn btn-outline-secondary ms-2">
+            <i class="fas fa-times me-1"></i>Clear Filters
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update case status
+function updateCaseStatus(caseId, newStatus) {
+    if (confirm(`Are you sure you want to ${newStatus} this case?`)) {
+        showLoading();
+        
+        fetch(`/cases/${caseId}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error updating case status: ' + data.error);
+                hideLoading();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating case status');
+            hideLoading();
+        });
+    }
+}
+
+// Delete case
+function deleteCase(caseId, caseName) {
+    if (confirm(`Are you sure you want to delete the case "${caseName}"? This action cannot be undone.`)) {
+        showLoading();
+        
+        fetch(`/cases/${caseId}/delete`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting case: ' + data.error);
+                hideLoading();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting case');
+            hideLoading();
+        });
+    }
+}
+
+// Initialize DataTables for better table functionality
+$(document).ready(function() {
+    if ($('#casesTable tbody tr').length > 0) {
+        $('#casesTable').DataTable({
+            "paging": false,
+            "searching": false,
+            "info": false,
+            "ordering": true,
+            "order": [[ 5, "desc" ]], // Sort by updated date
+            "columnDefs": [
+                { "orderable": false, "targets": [7] } // Disable sorting on actions column
+            ]
+        });
+    }
+});
+</script>
+{% endblock %}

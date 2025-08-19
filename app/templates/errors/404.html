@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - LITE{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-search"></i>
+                        Page Not Found
+                    </h4>
+                </div>
+                <div class="card-body text-center">
+                    <h1 class="display-1 text-warning">404</h1>
+                    <h3 class="mb-3">Oops! Page not found</h3>
+                    <p class="lead mb-4">
+                        The page you're looking for doesn't exist or has been moved.
+                    </p>
+                    
+                    <div class="mb-4">
+                        <a href="{{ url_for('main.index') }}" class="btn btn-primary me-2">
+                            <i class="fas fa-home"></i> Return to Dashboard
+                        </a>
+                        <a href="javascript:history.back()" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Go Back
+                        </a>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>Looking for something specific?</strong> 
+                        Try using the navigation menu or search functionality.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

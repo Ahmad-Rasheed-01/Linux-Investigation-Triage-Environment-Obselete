@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}About - LITE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-info-circle me-2"></i>About LITE
+                </h1>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Linux Investigation Triage Environment</h4>
+                    <p class="card-text">
+                        LITE (Linux Investigation Triage Environment) is a comprehensive digital forensics platform 
+                        designed specifically for analyzing Linux system artifacts. It provides investigators with 
+                        powerful tools to ingest, analyze, and visualize forensic data from Linux systems.
+                    </p>
+                    
+                    <h5 class="mt-4">Key Features</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Case Management:</strong> Organize investigations with comprehensive case tracking
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>JSON Artifact Ingestion:</strong> Process and analyze Linux forensic artifacts
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>PostgreSQL Backend:</strong> Scalable database with schema isolation per case
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Interactive Dashboard:</strong> Real-time statistics and case overview
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Data Visualization:</strong> Charts and graphs for forensic analysis
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Export Capabilities:</strong> Export data in multiple formats (CSV, JSON)
+                        </li>
+                    </ul>
+                    
+                    <h5 class="mt-4">Supported Artifact Types</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-users text-primary me-2"></i>User Accounts</li>
+                                <li><i class="fas fa-cogs text-primary me-2"></i>System Processes</li>
+                                <li><i class="fas fa-network-wired text-primary me-2"></i>Network Connections</li>
+                                <li><i class="fas fa-hdd text-primary me-2"></i>File System Data</li>
+                                <li><i class="fas fa-terminal text-primary me-2"></i>System Logs</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-shield-alt text-primary me-2"></i>Security Events</li>
+                                <li><i class="fas fa-clock text-primary me-2"></i>Timeline Analysis</li>
+                                <li><i class="fas fa-search text-primary me-2"></i>Artifact Search</li>
+                                <li><i class="fas fa-download text-primary me-2"></i>Browser Data</li>
+                                <li><i class="fas fa-server text-primary me-2"></i>System Configuration</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info me-2"></i>System Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Version:</strong></td>
+                            <td>1.0.0</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Framework:</strong></td>
+                            <td>Flask</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Database:</strong></td>
+                            <td>PostgreSQL</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Frontend:</strong></td>
+                            <td>Bootstrap 5</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Charts:</strong></td>
+                            <td>Chart.js</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-graduation-cap me-2"></i>Academic Project
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This application was developed as part of a Final Year Project (FYP) 
+                        for digital forensics research and education.
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            Developed with support from the Higher Education Commission
+                        </small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,670 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis - {{ case.case_name }} - LITE{% endblock %}
+
+{% block content %}
+<!-- Case Header -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center">
+            <h2 class="mb-0 me-3">{{ case.case_name }}</h2>
+            <span class="badge bg-{{ 'success' if case.status == 'active' else 'warning' if case.status == 'inactive' else 'secondary' }} fs-6">
+                {{ case.status.title() }}
+            </span>
+        </div>
+        <p class="text-muted mb-0">Forensic Analysis Dashboard</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('cases.view_case', case_id=case.case_uuid) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Case
+            </a>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-tools me-1"></i>Tools
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportData()">
+                        <i class="fas fa-download me-2"></i>Export Data
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="generateReport()">
+                        <i class="fas fa-file-pdf me-2"></i>Generate Report
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="refreshData()">
+                        <i class="fas fa-sync me-2"></i>Refresh Data
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Navigation -->
+<div class="row">
+    <!-- Left Sidebar Navigation -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-sitemap me-2"></i>Analysis Categories
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <!-- Overview -->
+                    <a href="#overview" class="list-group-item list-group-item-action active" data-category="overview">
+                        <i class="fas fa-chart-pie me-2"></i>Overview
+                    </a>
+                    
+                    <!-- System Information -->
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-server me-2"></i>System Information</span>
+                            <button class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#systemCollapse">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="systemCollapse">
+                            <div class="mt-2">
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='system', subcategory='metadata') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-info-circle me-2"></i>System Metadata
+                                </a>
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='system', subcategory='hardware') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-microchip me-2"></i>Hardware Info
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Users & Accounts -->
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-users me-2"></i>Users & Accounts</span>
+                            <button class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#usersCollapse">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="usersCollapse">
+                            <div class="mt-2">
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='users', subcategory='accounts') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-user me-2"></i>User Accounts
+                                </a>
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='users', subcategory='groups') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-users me-2"></i>Groups
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Processes -->
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-cogs me-2"></i>Processes</span>
+                            <button class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#processesCollapse">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="processesCollapse">
+                            <div class="mt-2">
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='processes', subcategory='running') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-play me-2"></i>Running Processes
+                                </a>
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='processes', subcategory='services') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-service me-2"></i>System Services
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Network Activity -->
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-network-wired me-2"></i>Network Activity</span>
+                            <button class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#networkCollapse">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="networkCollapse">
+                            <div class="mt-2">
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='network', subcategory='connections') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-plug me-2"></i>Connections
+                                </a>
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='network', subcategory='firewall') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-shield-alt me-2"></i>Firewall Rules
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- System Logs -->
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-file-alt me-2"></i>System Logs</span>
+                            <button class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#logsCollapse">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="logsCollapse">
+                            <div class="mt-2">
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='logs', subcategory='auth') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-key me-2"></i>Authentication
+                                </a>
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='logs', subcategory='system') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-server me-2"></i>System Logs
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Browser Data -->
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-globe me-2"></i>Browser Data</span>
+                            <button class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#browserCollapse">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="collapse show" id="browserCollapse">
+                            <div class="mt-2">
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='browser', subcategory='history') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-history me-2"></i>Browsing History
+                                </a>
+                                <a href="{{ url_for('analysis.view_category', case_id=case.case_uuid, category='browser', subcategory='downloads') }}" 
+                                   class="d-block text-decoration-none py-1 ps-3 text-muted subcategory-link">
+                                    <i class="fas fa-download me-2"></i>Downloads
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Search -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>Quick Search
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="quickSearchForm">
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm" id="searchQuery" 
+                               placeholder="Search across all data...">
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Search
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="col-md-9">
+        <div id="analysisContent">
+            <!-- Overview Content -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>Case Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Statistics Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-database fa-2x mb-2"></i>
+                                    <h4>{{ table_stats.total_tables or 0 }}</h4>
+                                    <small>Data Tables</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-list fa-2x mb-2"></i>
+                                    <h4>{{ table_stats.total_records or 0 }}</h4>
+                                    <small>Total Records</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-file-alt fa-2x mb-2"></i>
+                                    <h4>{{ table_stats.processed_files or 0 }}</h4>
+                                    <small>Processed Files</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-clock fa-2x mb-2"></i>
+                                    <h4>{{ case.updated_at.strftime('%m/%d') }}</h4>
+                                    <small>Last Updated</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Distribution Chart -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Data Distribution by Category</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="dataDistributionChart" width="400" height="300"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Top Data Categories</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Category</th>
+                                                    <th>Records</th>
+                                                    <th>Percentage</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="categoryStatsTable">
+                                                <!-- Populated by JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Recent Analysis Activity</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="timeline">
+                                        <div class="timeline-item">
+                                            <div class="timeline-marker bg-success"></div>
+                                            <div class="timeline-content">
+                                                <h6 class="timeline-title">Case Created</h6>
+                                                <p class="timeline-text">Investigation case was initialized</p>
+                                                <small class="text-muted">{{ case.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                                            </div>
+                                        </div>
+                                        {% if case.updated_at != case.created_at %}
+                                        <div class="timeline-item">
+                                            <div class="timeline-marker bg-info"></div>
+                                            <div class="timeline-content">
+                                                <h6 class="timeline-title">Case Updated</h6>
+                                                <p class="timeline-text">Case information was modified</p>
+                                                <small class="text-muted">{{ case.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.subcategory-link:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+    border-radius: 4px;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -23px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #dee2e6;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 3px solid #007bff;
+}
+
+.timeline-title {
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.timeline-text {
+    margin-bottom: 5px;
+    color: #6c757d;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Navigation handling
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle category navigation
+    const categoryLinks = document.querySelectorAll('[data-category]');
+    categoryLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Update active state
+            categoryLinks.forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+            
+            const category = this.dataset.category;
+            if (category === 'overview') {
+                // Show overview content (already loaded)
+                return;
+            }
+            
+            // Load category content
+            loadCategoryContent(category);
+        });
+    });
+    
+    // Initialize data distribution chart
+    initializeCharts();
+    
+    // Handle quick search
+    document.getElementById('quickSearchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const query = document.getElementById('searchQuery').value.trim();
+        if (query) {
+            performQuickSearch(query);
+        }
+    });
+});
+
+// Load category content
+function loadCategoryContent(category) {
+    const contentArea = document.getElementById('analysisContent');
+    
+    // Show loading state
+    contentArea.innerHTML = `
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted">Loading ${category} data...</p>
+            </div>
+        </div>
+    `;
+    
+    // Fetch category data
+    fetch(`/analysis/{{ case.case_uuid }}/${category}`)
+        .then(response => response.text())
+        .then(html => {
+            contentArea.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading category:', error);
+            contentArea.innerHTML = `
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                        <h5 class="text-muted">Error Loading Data</h5>
+                        <p class="text-muted">Failed to load ${category} data. Please try again.</p>
+                        <button class="btn btn-primary" onclick="loadCategoryContent('${category}')">
+                            <i class="fas fa-retry me-1"></i>Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// Initialize charts
+function initializeCharts() {
+    // Fetch table statistics
+    fetch(`/api/cases/{{ case.case_uuid }}/tables`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                createDataDistributionChart(data.tables);
+                updateCategoryStatsTable(data.tables);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching table stats:', error);
+        });
+}
+
+// Create data distribution chart
+function createDataDistributionChart(tables) {
+    const ctx = document.getElementById('dataDistributionChart').getContext('2d');
+    
+    const labels = tables.map(table => table.table_name.replace('_', ' ').toUpperCase());
+    const data = tables.map(table => table.row_count);
+    const colors = [
+        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+        '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+    ];
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update category stats table
+function updateCategoryStatsTable(tables) {
+    const tbody = document.getElementById('categoryStatsTable');
+    const totalRecords = tables.reduce((sum, table) => sum + table.row_count, 0);
+    
+    // Sort by record count descending
+    const sortedTables = tables.sort((a, b) => b.row_count - a.row_count);
+    
+    tbody.innerHTML = '';
+    sortedTables.slice(0, 5).forEach(table => {
+        const percentage = totalRecords > 0 ? ((table.row_count / totalRecords) * 100).toFixed(1) : 0;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${table.table_name.replace('_', ' ').toUpperCase()}</td>
+            <td>${table.row_count.toLocaleString()}</td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                        <div class="progress-bar" style="width: ${percentage}%"></div>
+                    </div>
+                    <small>${percentage}%</small>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Perform quick search
+function performQuickSearch(query) {
+    const contentArea = document.getElementById('analysisContent');
+    
+    // Show loading state
+    contentArea.innerHTML = `
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>Search Results for "${query}"
+                </h5>
+            </div>
+            <div class="card-body text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Searching...</span>
+                </div>
+                <p class="text-muted">Searching across all data...</p>
+            </div>
+        </div>
+    `;
+    
+    // Perform search
+    fetch(`/analysis/{{ case.case_uuid }}/search`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query: query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        displaySearchResults(query, data.results || []);
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        contentArea.innerHTML = `
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                    <h5 class="text-muted">Search Error</h5>
+                    <p class="text-muted">Failed to perform search. Please try again.</p>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// Display search results
+function displaySearchResults(query, results) {
+    const contentArea = document.getElementById('analysisContent');
+    
+    let html = `
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>Search Results for "${query}"
+                </h5>
+                <small class="text-muted">${results.length} results found</small>
+            </div>
+            <div class="card-body">
+    `;
+    
+    if (results.length === 0) {
+        html += `
+            <div class="text-center py-4">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Results Found</h5>
+                <p class="text-muted">Try adjusting your search terms or browse categories manually.</p>
+            </div>
+        `;
+    } else {
+        html += '<div class="table-responsive">';
+        html += '<table class="table table-striped">';
+        html += '<thead><tr><th>Category</th><th>Match</th><th>Context</th><th>Actions</th></tr></thead>';
+        html += '<tbody>';
+        
+        results.forEach(result => {
+            html += `
+                <tr>
+                    <td><span class="badge bg-info">${result.category}</span></td>
+                    <td>${result.match}</td>
+                    <td><small class="text-muted">${result.context}</small></td>
+                    <td>
+                        <a href="${result.link}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>View
+                        </a>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    html += '</div></div>';
+    contentArea.innerHTML = html;
+}
+
+// Utility functions
+function exportData() {
+    alert('Export functionality will be implemented in a future version.');
+}
+
+function generateReport() {
+    alert('Report generation functionality will be implemented in a future version.');
+}
+
+function refreshData() {
+    location.reload();
+}
+</script>
+{% endblock %}

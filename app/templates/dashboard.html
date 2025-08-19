@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LITE{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+    </h1>
+    <div>
+        <a href="{{ url_for('cases.create_case') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>New Case
+        </a>
+        <button class="btn btn-outline-secondary" onclick="refreshDashboard()">
+            <i class="fas fa-sync-alt me-1"></i>Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">{{ stats.total_cases }}</h4>
+                        <p class="card-text mb-0">Total Cases</p>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-folder"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">{{ stats.active_cases }}</h4>
+                        <p class="card-text mb-0">Active Cases</p>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-play-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">{{ stats.total_ingestions }}</h4>
+                        <p class="card-text mb-0">Total Ingestions</p>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="card-title mb-1">{{ "%.1f GB"|format(stats.total_data_gb) }}</h4>
+                        <p class="card-text mb-0">Data Processed</p>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-database"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Case Status Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="caseStatusChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Monthly Case Creation
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyTrendChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clock me-2"></i>Recent Cases
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_cases %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Case Name</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for case in recent_cases %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('cases.view_case', case_id=case.id) }}" class="text-decoration-none">
+                                        {{ case.case_name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ case.status }}">
+                                        {{ case.status.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if case.case_priority == 'high' %}
+                                        <span class="badge bg-danger">High</span>
+                                    {% elif case.case_priority == 'medium' %}
+                                        <span class="badge bg-warning">Medium</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Low</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ case.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="{{ url_for('cases.view_case', case_id=case.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('analysis.case_analysis', case_id=case.id) }}" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-chart-bar"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No cases found. <a href="{{ url_for('cases.create_case') }}">Create your first case</a></p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tasks me-2"></i>Ingestion Activity
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_ingestions %}
+                <div class="list-group list-group-flush">
+                    {% for ingestion in recent_ingestions %}
+                    <div class="list-group-item border-0 px-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ ingestion.filename }}</h6>
+                                <p class="mb-1 text-muted small">{{ ingestion.artifact_type }}</p>
+                                <small class="text-muted">{{ ingestion.started_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            <div>
+                                {% if ingestion.status == 'completed' %}
+                                    <span class="badge bg-success">✓</span>
+                                {% elif ingestion.status == 'failed' %}
+                                    <span class="badge bg-danger">✗</span>
+                                {% elif ingestion.status == 'processing' %}
+                                    <span class="badge bg-primary">⟳</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">⏸</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-upload fa-2x text-muted mb-3"></i>
+                    <p class="text-muted">No recent ingestion activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- System Health -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-heartbeat me-2"></i>System Health
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Database</span>
+                    <span class="badge bg-success">Online</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Storage</span>
+                    <span class="badge bg-success">OK</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Ingestion Queue</span>
+                    <span class="badge bg-info">{{ stats.pending_ingestions }} pending</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Dashboard data from Flask
+const dashboardData = {
+    caseStats: {{ stats.case_status_distribution | tojson }},
+    monthlyTrends: {{ stats.monthly_trends | tojson }},
+    priorityDistribution: {{ stats.priority_distribution | tojson }}
+};
+
+// Case Status Pie Chart
+const caseStatusCtx = document.getElementById('caseStatusChart').getContext('2d');
+const caseStatusChart = new Chart(caseStatusCtx, {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(dashboardData.caseStats),
+        datasets: [{
+            data: Object.values(dashboardData.caseStats),
+            backgroundColor: [
+                '#28a745',  // active - green
+                '#ffc107',  // inactive - yellow
+                '#dc3545',  // closed - red
+                '#6c757d'   // other - gray
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Monthly Trend Line Chart
+const monthlyTrendCtx = document.getElementById('monthlyTrendChart').getContext('2d');
+const monthlyTrendChart = new Chart(monthlyTrendCtx, {
+    type: 'line',
+    data: {
+        labels: dashboardData.monthlyTrends.map(item => item.month),
+        datasets: [{
+            label: 'Cases Created',
+            data: dashboardData.monthlyTrends.map(item => item.count),
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+
+// Refresh dashboard data
+function refreshDashboard() {
+    showLoading();
+    
+    fetch('/api/dashboard/stats')
+        .then(response => response.json())
+        .then(data => {
+            // Update statistics cards
+            updateStatistics(data);
+            
+            // Update charts
+            updateCharts(data);
+            
+            hideLoading();
+        })
+        .catch(error => {
+            console.error('Error refreshing dashboard:', error);
+            hideLoading();
+        });
+}
+
+function updateStatistics(data) {
+    // Update the statistics cards with new data
+    if (data.total_cases !== undefined) {
+        document.querySelector('.card.bg-primary .card-title').textContent = data.total_cases;
+    }
+    if (data.active_cases !== undefined) {
+        document.querySelector('.card.bg-success .card-title').textContent = data.active_cases;
+    }
+    if (data.total_ingestions !== undefined) {
+        document.querySelector('.card.bg-info .card-title').textContent = data.total_ingestions;
+    }
+    if (data.total_data_gb !== undefined) {
+        document.querySelector('.card.bg-warning .card-title').textContent = data.total_data_gb.toFixed(1) + ' GB';
+    }
+}
+
+function updateCharts(data) {
+    // Update chart data
+    if (data.case_status_distribution) {
+        caseStatusChart.data.labels = Object.keys(data.case_status_distribution);
+        caseStatusChart.data.datasets[0].data = Object.values(data.case_status_distribution);
+        caseStatusChart.update();
+    }
+    
+    if (data.monthly_trends) {
+        monthlyTrendChart.data.labels = data.monthly_trends.map(item => item.month);
+        monthlyTrendChart.data.datasets[0].data = data.monthly_trends.map(item => item.count);
+        monthlyTrendChart.update();
+    }
+}
+
+// Auto-refresh every 30 seconds
+setInterval(refreshDashboard, 30000);
+</script>
+{% endblock %}

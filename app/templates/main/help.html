@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Help - LITE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-question-circle me-2"></i>Help & Documentation
+                </h1>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Navigation</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="#getting-started" class="list-group-item list-group-item-action">
+                        <i class="fas fa-play me-2"></i>Getting Started
+                    </a>
+                    <a href="#case-management" class="list-group-item list-group-item-action">
+                        <i class="fas fa-folder me-2"></i>Case Management
+                    </a>
+                    <a href="#artifact-ingestion" class="list-group-item list-group-item-action">
+                        <i class="fas fa-upload me-2"></i>Artifact Ingestion
+                    </a>
+                    <a href="#analysis" class="list-group-item list-group-item-action">
+                        <i class="fas fa-search me-2"></i>Analysis
+                    </a>
+                    <a href="#troubleshooting" class="list-group-item list-group-item-action">
+                        <i class="fas fa-wrench me-2"></i>Troubleshooting
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-9">
+            <div class="card" id="getting-started">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-play me-2"></i>Getting Started
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>1. Create a New Case</h5>
+                    <p>Start by creating a new investigation case from the Cases menu. Provide a descriptive name, case number, and investigator details.</p>
+                    
+                    <h5>2. Upload Artifacts</h5>
+                    <p>Upload JSON artifact files collected from Linux systems. LITE supports various artifact types including system logs, user data, and network information.</p>
+                    
+                    <h5>3. Monitor Ingestion</h5>
+                    <p>Track the ingestion progress on the dashboard. The system will automatically process and categorize your artifacts.</p>
+                    
+                    <h5>4. Analyze Data</h5>
+                    <p>Use the analysis tools to explore your data, create visualizations, and export findings.</p>
+                </div>
+            </div>
+            
+            <div class="card mt-4" id="case-management">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-folder me-2"></i>Case Management
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Creating Cases</h5>
+                    <ul>
+                        <li>Navigate to <strong>Cases → Create New Case</strong></li>
+                        <li>Fill in required information: Case Name, Case Number, Investigator</li>
+                        <li>Add optional description and set priority level</li>
+                        <li>Click "Create Case" to initialize the case database schema</li>
+                    </ul>
+                    
+                    <h5>Case Status Management</h5>
+                    <ul>
+                        <li><span class="badge bg-success">Active</span> - Case is currently being investigated</li>
+                        <li><span class="badge bg-warning">Inactive</span> - Case is paused or on hold</li>
+                        <li><span class="badge bg-secondary">Closed</span> - Investigation completed</li>
+                    </ul>
+                    
+                    <h5>Case Organization</h5>
+                    <p>Each case maintains its own isolated database schema, ensuring data separation and integrity between investigations.</p>
+                </div>
+            </div>
+            
+            <div class="card mt-4" id="artifact-ingestion">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>Artifact Ingestion
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Supported File Types</h5>
+                    <p>LITE currently supports JSON format artifacts from Linux forensic tools.</p>
+                    
+                    <h5>Upload Process</h5>
+                    <ol>
+                        <li>Select a case from the Cases list</li>
+                        <li>Click "Upload Artifacts" button</li>
+                        <li>Choose JSON files from your system</li>
+                        <li>Monitor ingestion progress in real-time</li>
+                    </ol>
+                    
+                    <h5>Artifact Categories</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul>
+                                <li>User Accounts & Groups</li>
+                                <li>System Processes</li>
+                                <li>Network Connections</li>
+                                <li>File System Information</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul>
+                                <li>System Logs</li>
+                                <li>Browser History</li>
+                                <li>Security Events</li>
+                                <li>Configuration Files</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <h5>Ingestion Status</h5>
+                    <ul>
+                        <li><span class="badge bg-primary">Processing</span> - File is being ingested</li>
+                        <li><span class="badge bg-success">Completed</span> - Successfully processed</li>
+                        <li><span class="badge bg-danger">Failed</span> - Error during processing</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-4" id="analysis">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-search me-2"></i>Analysis Tools
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Dashboard Overview</h5>
+                    <p>The main dashboard provides real-time statistics and visualizations of your investigation data.</p>
+                    
+                    <h5>Case-Specific Analysis</h5>
+                    <ul>
+                        <li>View detailed case information and statistics</li>
+                        <li>Browse artifacts by category</li>
+                        <li>Search and filter data</li>
+                        <li>Export findings in various formats</li>
+                    </ul>
+                    
+                    <h5>Data Visualization</h5>
+                    <ul>
+                        <li>Interactive charts and graphs</li>
+                        <li>Timeline analysis</li>
+                        <li>Statistical summaries</li>
+                        <li>Trend analysis</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-4" id="troubleshooting">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-wrench me-2"></i>Troubleshooting
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <h5>Common Issues</h5>
+                    
+                    <div class="accordion" id="troubleshootingAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingOne">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne">
+                                    File Upload Fails
+                                </button>
+                            </h2>
+                            <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>Ensure file is in valid JSON format</li>
+                                        <li>Check file size limits</li>
+                                        <li>Verify case is in active status</li>
+                                        <li>Check disk space availability</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingTwo">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo">
+                                    Database Connection Issues
+                                </button>
+                            </h2>
+                            <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>Check PostgreSQL service status</li>
+                                        <li>Verify database credentials</li>
+                                        <li>Ensure database server is accessible</li>
+                                        <li>Check network connectivity</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingThree">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree">
+                                    Performance Issues
+                                </button>
+                            </h2>
+                            <div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>Monitor system resources (CPU, Memory, Disk)</li>
+                                        <li>Check database performance and indexing</li>
+                                        <li>Consider archiving old cases</li>
+                                        <li>Optimize large file processing</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mt-4">Getting Support</h5>
+                    <p>For additional support or to report issues:</p>
+                    <ul>
+                        <li>Check the system health status at <code>/health</code></li>
+                        <li>Review application logs for error details</li>
+                        <li>Contact your system administrator</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Smooth scrolling for navigation links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

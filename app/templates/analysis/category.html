@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+
+{% block title %}{{ category_info.display_name }} - {{ case.case_name }} - LITE{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Navigation -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('cases.view_case', case_id=case.case_uuid) }}">
+                <i class="fas fa-folder me-1"></i>{{ case.case_name }}
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('analysis.analysis_home', case_id=case.case_uuid) }}">
+                <i class="fas fa-chart-pie me-1"></i>Analysis
+            </a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">
+            {{ category_info.display_name }}
+        </li>
+    </ol>
+</nav>
+
+<!-- Page Header -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center">
+            <i class="{{ category_info.icon }} fa-2x me-3 text-primary"></i>
+            <div>
+                <h2 class="mb-0">{{ category_info.display_name }}</h2>
+                <p class="text-muted mb-0">{{ category_info.description }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-secondary" onclick="refreshData()">
+                <i class="fas fa-sync me-1"></i>Refresh
+            </button>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportData('csv')">
+                        <i class="fas fa-file-csv me-2"></i>Export as CSV
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportData('json')">
+                        <i class="fas fa-file-code me-2"></i>Export as JSON
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportData('pdf')">
+                        <i class="fas fa-file-pdf me-2"></i>Export as PDF
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-list fa-2x mb-2"></i>
+                <h4 id="totalRecords">{{ pagination.total if pagination else 0 }}</h4>
+                <small>Total Records</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-eye fa-2x mb-2"></i>
+                <h4 id="displayedRecords">{{ data|length if data else 0 }}</h4>
+                <small>Displayed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-filter fa-2x mb-2"></i>
+                <h4 id="filteredRecords">{{ pagination.total if pagination else 0 }}</h4>
+                <small>After Filters</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h4>{{ pagination.pages if pagination else 1 }}</h4>
+                <small>Total Pages</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Search -->
+<div class="card mb-4">
+    <div class="card-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-filter me-2"></i>Filters & Search
+                </h5>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">
+                    <i class="fas fa-times me-1"></i>Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <form id="filterForm" method="GET">
+            <div class="row">
+                <!-- Search -->
+                <div class="col-md-4 mb-3">
+                    <label for="search" class="form-label">Search</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="search" name="search" 
+                               value="{{ request.args.get('search', '') }}" 
+                               placeholder="Search in all fields...">
+                        <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Sort By -->
+                <div class="col-md-3 mb-3">
+                    <label for="sort_by" class="form-label">Sort By</label>
+                    <select class="form-select" id="sort_by" name="sort_by">
+                        {% for column in category_info.columns %}
+                        <option value="{{ column.name }}" 
+                                {% if request.args.get('sort_by') == column.name %}selected{% endif %}>
+                            {{ column.display_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Sort Order -->
+                <div class="col-md-2 mb-3">
+                    <label for="sort_order" class="form-label">Order</label>
+                    <select class="form-select" id="sort_order" name="sort_order">
+                        <option value="asc" {% if request.args.get('sort_order') == 'asc' %}selected{% endif %}>Ascending</option>
+                        <option value="desc" {% if request.args.get('sort_order', 'desc') == 'desc' %}selected{% endif %}>Descending</option>
+                    </select>
+                </div>
+                
+                <!-- Per Page -->
+                <div class="col-md-2 mb-3">
+                    <label for="per_page" class="form-label">Per Page</label>
+                    <select class="form-select" id="per_page" name="per_page">
+                        <option value="25" {% if request.args.get('per_page', '25') == '25' %}selected{% endif %}>25</option>
+                        <option value="50" {% if request.args.get('per_page') == '50' %}selected{% endif %}>50</option>
+                        <option value="100" {% if request.args.get('per_page') == '100' %}selected{% endif %}>100</option>
+                        <option value="200" {% if request.args.get('per_page') == '200' %}selected{% endif %}>200</option>
+                    </select>
+                </div>
+                
+                <!-- Apply Button -->
+                <div class="col-md-1 mb-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Advanced Filters (Collapsible) -->
+            <div class="row">
+                <div class="col-12">
+                    <button class="btn btn-link p-0 text-decoration-none" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#advancedFilters">
+                        <i class="fas fa-chevron-down me-1"></i>Advanced Filters
+                    </button>
+                    <div class="collapse" id="advancedFilters">
+                        <div class="row mt-3">
+                            {% for column in category_info.columns[:6] %}
+                            {% if column.filterable %}
+                            <div class="col-md-4 mb-3">
+                                <label for="filter_{{ column.name }}" class="form-label">{{ column.display_name }}</label>
+                                {% if column.type == 'text' %}
+                                <input type="text" class="form-control" id="filter_{{ column.name }}" 
+                                       name="filter_{{ column.name }}" 
+                                       value="{{ request.args.get('filter_' + column.name, '') }}" 
+                                       placeholder="Filter by {{ column.display_name.lower() }}...">
+                                {% elif column.type == 'select' %}
+                                <select class="form-select" id="filter_{{ column.name }}" name="filter_{{ column.name }}">
+                                    <option value="">All {{ column.display_name }}</option>
+                                    {% for option in column.options %}
+                                    <option value="{{ option }}" 
+                                            {% if request.args.get('filter_' + column.name) == option %}selected{% endif %}>
+                                        {{ option }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-table me-2"></i>{{ category_info.display_name }} Data
+                </h5>
+            </div>
+            <div class="col-md-6 text-end">
+                {% if pagination and pagination.total > 0 %}
+                <small class="text-muted">
+                    Showing {{ pagination.per_page * (pagination.page - 1) + 1 }} to 
+                    {{ pagination.per_page * (pagination.page - 1) + data|length }} of 
+                    {{ pagination.total }} entries
+                </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if data %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0" id="dataTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="50">#</th>
+                        {% for column in category_info.columns %}
+                        <th>
+                            {{ column.display_name }}
+                            {% if column.sortable %}
+                            <i class="fas fa-sort text-muted ms-1"></i>
+                            {% endif %}
+                        </th>
+                        {% endfor %}
+                        <th width="100">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data %}
+                    <tr>
+                        <td>{{ loop.index + (pagination.per_page * (pagination.page - 1)) if pagination else loop.index }}</td>
+                        {% for column in category_info.columns %}
+                        <td>
+                            {% set value = row[column.name] %}
+                            {% if column.type == 'timestamp' %}
+                                {% if value %}
+                                <span data-bs-toggle="tooltip" title="{{ value }}">
+                                    {{ moment(value).format('YYYY-MM-DD HH:mm:ss') if value else '-' }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            {% elif column.type == 'json' %}
+                                {% if value %}
+                                <button class="btn btn-sm btn-outline-info" onclick="showJsonModal({{ value|tojson }})">
+                                    <i class="fas fa-code me-1"></i>View JSON
+                                </button>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            {% elif column.type == 'url' %}
+                                {% if value %}
+                                <a href="{{ value }}" target="_blank" class="text-decoration-none">
+                                    {{ value[:50] }}{% if value|length > 50 %}...{% endif %}
+                                    <i class="fas fa-external-link-alt ms-1"></i>
+                                </a>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            {% elif column.type == 'number' %}
+                                {{ value|default('-', true) }}
+                            {% elif column.type == 'boolean' %}
+                                {% if value is not none %}
+                                <span class="badge bg-{{ 'success' if value else 'secondary' }}">
+                                    {{ 'Yes' if value else 'No' }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            {% else %}
+                                {% if value %}
+                                <span data-bs-toggle="tooltip" title="{{ value }}">
+                                    {{ value[:100] }}{% if value|length > 100 %}...{% endif %}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary" 
+                                        onclick="viewRowDetails({{ row|tojson }})" 
+                                        data-bs-toggle="tooltip" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-info" 
+                                        onclick="copyRowData({{ row|tojson }})" 
+                                        data-bs-toggle="tooltip" title="Copy Data">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No Data Available</h5>
+            <p class="text-muted">No records found for the current filters.</p>
+            {% if request.args.get('search') or request.args.get('filter_') %}
+            <button class="btn btn-outline-primary" onclick="clearFilters()">
+                <i class="fas fa-times me-1"></i>Clear Filters
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="card-footer">
+        <nav aria-label="Data pagination">
+            <ul class="pagination justify-content-center mb-0">
+                <!-- Previous Page -->
+                <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+                    <a class="page-link" href="{{ url_for(request.endpoint, **request.args, page=pagination.prev_num) if pagination.has_prev else '#' }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                
+                <!-- Page Numbers -->
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num != pagination.page %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for(request.endpoint, **request.args, page=page_num) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                <!-- Next Page -->
+                <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+                    <a class="page-link" href="{{ url_for(request.endpoint, **request.args, page=pagination.next_num) if pagination.has_next else '#' }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Row Details Modal -->
+<div class="modal fade" id="rowDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>Record Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="rowDetailsContent">
+                <!-- Content populated by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="copyModalData()">
+                    <i class="fas fa-copy me-1"></i>Copy Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JSON Viewer Modal -->
+<div class="modal fade" id="jsonModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-code me-2"></i>JSON Data
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="jsonContent" class="bg-light p-3 rounded" style="max-height: 500px; overflow-y: auto;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="copyJsonData()">
+                    <i class="fas fa-copy me-1"></i>Copy JSON
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Auto-submit form on filter changes
+    const filterForm = document.getElementById('filterForm');
+    const formElements = filterForm.querySelectorAll('select, input[type="text"]');
+    
+    formElements.forEach(element => {
+        if (element.id !== 'search') {
+            element.addEventListener('change', function() {
+                filterForm.submit();
+            });
+        }
+    });
+    
+    // Search with debounce
+    const searchInput = document.getElementById('search');
+    let searchTimeout;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            filterForm.submit();
+        }, 500);
+    });
+});
+
+// View row details
+function viewRowDetails(rowData) {
+    const content = document.getElementById('rowDetailsContent');
+    let html = '<div class="table-responsive">';
+    html += '<table class="table table-bordered">';
+    
+    Object.keys(rowData).forEach(key => {
+        const value = rowData[key];
+        html += `<tr>`;
+        html += `<th class="bg-light" style="width: 200px;">${key.replace(/_/g, ' ').toUpperCase()}</th>`;
+        
+        if (value === null || value === undefined) {
+            html += `<td><span class="text-muted">-</span></td>`;
+        } else if (typeof value === 'object') {
+            html += `<td><pre class="mb-0">${JSON.stringify(value, null, 2)}</pre></td>`;
+        } else if (typeof value === 'boolean') {
+            html += `<td><span class="badge bg-${value ? 'success' : 'secondary'}">${value ? 'Yes' : 'No'}</span></td>`;
+        } else if (typeof value === 'string' && value.startsWith('http')) {
+            html += `<td><a href="${value}" target="_blank">${value}</a></td>`;
+        } else {
+            html += `<td>${value}</td>`;
+        }
+        
+        html += `</tr>`;
+    });
+    
+    html += '</table></div>';
+    content.innerHTML = html;
+    
+    const modal = new bootstrap.Modal(document.getElementById('rowDetailsModal'));
+    modal.show();
+}
+
+// Show JSON modal
+function showJsonModal(jsonData) {
+    const content = document.getElementById('jsonContent');
+    content.textContent = JSON.stringify(jsonData, null, 2);
+    
+    const modal = new bootstrap.Modal(document.getElementById('jsonModal'));
+    modal.show();
+}
+
+// Copy row data
+function copyRowData(rowData) {
+    const text = JSON.stringify(rowData, null, 2);
+    navigator.clipboard.writeText(text).then(() => {
+        showAlert('Data copied to clipboard!', 'success');
+    }).catch(() => {
+        showAlert('Failed to copy data', 'error');
+    });
+}
+
+// Copy modal data
+function copyModalData() {
+    const content = document.getElementById('rowDetailsContent');
+    const text = content.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        showAlert('Data copied to clipboard!', 'success');
+    }).catch(() => {
+        showAlert('Failed to copy data', 'error');
+    });
+}
+
+// Copy JSON data
+function copyJsonData() {
+    const content = document.getElementById('jsonContent');
+    const text = content.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        showAlert('JSON copied to clipboard!', 'success');
+    }).catch(() => {
+        showAlert('Failed to copy JSON', 'error');
+    });
+}
+
+// Clear search
+function clearSearch() {
+    document.getElementById('search').value = '';
+    document.getElementById('filterForm').submit();
+}
+
+// Clear all filters
+function clearFilters() {
+    const form = document.getElementById('filterForm');
+    const inputs = form.querySelectorAll('input[type="text"], select');
+    
+    inputs.forEach(input => {
+        if (input.id === 'sort_by' || input.id === 'sort_order' || input.id === 'per_page') {
+            // Keep sort and pagination settings
+            return;
+        }
+        input.value = '';
+    });
+    
+    form.submit();
+}
+
+// Refresh data
+function refreshData() {
+    location.reload();
+}
+
+// Export data
+function exportData(format) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', format);
+    
+    const url = `${window.location.pathname}?${params.toString()}`;
+    window.open(url, '_blank');
+}
+
+// Show alert
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

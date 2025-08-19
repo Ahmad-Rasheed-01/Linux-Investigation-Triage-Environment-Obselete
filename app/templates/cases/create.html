@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Create Case - LITE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-plus me-2"></i>Create New Investigation Case
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="createCaseForm">
+                    <!-- Case Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="case_name" class="form-label">Case Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="case_name" name="case_name" 
+                                   placeholder="Enter case name" required>
+                            <div class="form-text">A unique identifier for this investigation case</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="case_priority" class="form-label">Priority</label>
+                            <select class="form-select" id="case_priority" name="case_priority">
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="case_description" class="form-label">Case Description</label>
+                        <textarea class="form-control" id="case_description" name="case_description" 
+                                  rows="3" placeholder="Describe the investigation case..."></textarea>
+                        <div class="form-text">Provide details about the investigation objectives and scope</div>
+                    </div>
+                    
+                    <!-- Investigator Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="investigator_name" class="form-label">Lead Investigator</label>
+                            <input type="text" class="form-control" id="investigator_name" name="investigator_name" 
+                                   placeholder="Enter investigator name">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="investigator_email" class="form-label">Investigator Email</label>
+                            <input type="email" class="form-control" id="investigator_email" name="investigator_email" 
+                                   placeholder="investigator@example.com">
+                        </div>
+                    </div>
+                    
+                    <!-- Evidence Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="evidence_source" class="form-label">Evidence Source</label>
+                            <input type="text" class="form-control" id="evidence_source" name="evidence_source" 
+                                   placeholder="e.g., Server hostname, workstation ID">
+                            <div class="form-text">Source system or device where evidence was collected</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="collection_date" class="form-label">Collection Date</label>
+                            <input type="datetime-local" class="form-control" id="collection_date" name="collection_date">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="evidence_notes" class="form-label">Evidence Notes</label>
+                        <textarea class="form-control" id="evidence_notes" name="evidence_notes" 
+                                  rows="2" placeholder="Additional notes about evidence collection..."></textarea>
+                    </div>
+                    
+                    <!-- File Upload Section -->
+                    <div class="card bg-light mb-4">
+                        <div class="card-header bg-transparent">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-upload me-2"></i>Artifact Files (Optional)
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="artifact_files" class="form-label">JSON Artifact Files</label>
+                                <input type="file" class="form-control" id="artifact_files" name="artifact_files" 
+                                       multiple accept=".json" onchange="handleFileSelection()">
+                                <div class="form-text">
+                                    Select JSON artifact files to upload. You can also upload files later from the case view.
+                                    <br>Supported formats: .json (up to 500MB per file)
+                                </div>
+                            </div>
+                            
+                            <!-- File Preview -->
+                            <div id="filePreview" class="d-none">
+                                <h6>Selected Files:</h6>
+                                <div id="fileList" class="list-group"></div>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        Total files: <span id="fileCount">0</span> | 
+                                        Total size: <span id="totalSize">0 MB</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Form Actions -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('cases.list_cases') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Cancel
+                        </a>
+                        <div>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="fas fa-save me-1"></i>Create Case
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-cog fa-spin me-2"></i>Creating Case
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%" id="progressBar"></div>
+                </div>
+                <div id="progressText">Initializing case creation...</div>
+                <div class="mt-3">
+                    <small class="text-muted" id="progressDetails"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedFiles = [];
+let totalFileSize = 0;
+
+// Handle file selection
+function handleFileSelection() {
+    const fileInput = document.getElementById('artifact_files');
+    const files = Array.from(fileInput.files);
+    
+    selectedFiles = files;
+    totalFileSize = files.reduce((total, file) => total + file.size, 0);
+    
+    updateFilePreview();
+    validateFiles();
+}
+
+// Update file preview
+function updateFilePreview() {
+    const filePreview = document.getElementById('filePreview');
+    const fileList = document.getElementById('fileList');
+    const fileCount = document.getElementById('fileCount');
+    const totalSizeElement = document.getElementById('totalSize');
+    
+    if (selectedFiles.length === 0) {
+        filePreview.classList.add('d-none');
+        return;
+    }
+    
+    filePreview.classList.remove('d-none');
+    fileCount.textContent = selectedFiles.length;
+    totalSizeElement.textContent = formatFileSize(totalFileSize);
+    
+    // Clear and populate file list
+    fileList.innerHTML = '';
+    
+    selectedFiles.forEach((file, index) => {
+        const listItem = document.createElement('div');
+        listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+        
+        const fileInfo = document.createElement('div');
+        fileInfo.innerHTML = `
+            <strong>${file.name}</strong><br>
+            <small class="text-muted">${formatFileSize(file.size)} | ${file.type || 'Unknown type'}</small>
+        `;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn btn-sm btn-outline-danger';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.onclick = () => removeFile(index);
+        
+        listItem.appendChild(fileInfo);
+        listItem.appendChild(removeBtn);
+        fileList.appendChild(listItem);
+    });
+}
+
+// Remove file from selection
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    
+    // Update file input
+    const fileInput = document.getElementById('artifact_files');
+    const dt = new DataTransfer();
+    selectedFiles.forEach(file => dt.items.add(file));
+    fileInput.files = dt.files;
+    
+    totalFileSize = selectedFiles.reduce((total, file) => total + file.size, 0);
+    updateFilePreview();
+    validateFiles();
+}
+
+// Validate files
+function validateFiles() {
+    const submitBtn = document.getElementById('submitBtn');
+    const maxFileSize = 500 * 1024 * 1024; // 500MB
+    let hasErrors = false;
+    
+    // Check individual file sizes
+    selectedFiles.forEach(file => {
+        if (file.size > maxFileSize) {
+            hasErrors = true;
+            alert(`File "${file.name}" is too large. Maximum file size is 500MB.`);
+        }
+        
+        if (!file.name.toLowerCase().endsWith('.json')) {
+            hasErrors = true;
+            alert(`File "${file.name}" is not a JSON file. Only .json files are allowed.`);
+        }
+    });
+    
+    submitBtn.disabled = hasErrors;
+}
+
+// Handle form submission
+document.getElementById('createCaseForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+    
+    // Show progress modal
+    progressModal.show();
+    updateProgress(10, 'Creating case record...');
+    
+    // Submit form
+    fetch('/cases/create', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            updateProgress(100, 'Case created successfully!');
+            
+            setTimeout(() => {
+                window.location.href = `/cases/${data.case_id}`;
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Unknown error occurred');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        progressModal.hide();
+        alert('Error creating case: ' + error.message);
+    });
+});
+
+// Update progress
+function updateProgress(percentage, text, details = '') {
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const progressDetails = document.getElementById('progressDetails');
+    
+    progressBar.style.width = percentage + '%';
+    progressBar.setAttribute('aria-valuenow', percentage);
+    progressText.textContent = text;
+    progressDetails.textContent = details;
+}
+
+// Set default collection date to now
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+    document.getElementById('collection_date').value = localDateTime;
+});
+</script>
+{% endblock %}
