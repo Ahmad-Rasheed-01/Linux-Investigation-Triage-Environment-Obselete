@@ -475,8 +475,93 @@ BEGIN
     EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', schema_name);
     
     -- Create all tables in the new schema
-    -- (This would contain all the CREATE TABLE statements above with schema prefix)
-    -- For brevity, showing pattern - in actual implementation, all tables would be created
+    EXECUTE format('CREATE TABLE %I.processes (
+        id SERIAL PRIMARY KEY,
+        pid INTEGER NOT NULL,
+        ppid INTEGER,
+        name VARCHAR(255),
+        cmdline TEXT,
+        user_name VARCHAR(100),
+        cpu_percent DECIMAL(5,2),
+        memory_percent DECIMAL(5,2),
+        memory_info_rss BIGINT,
+        memory_info_vms BIGINT,
+        create_time TIMESTAMP,
+        status VARCHAR(50),
+        num_threads INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )', schema_name);
+    
+    EXECUTE format('CREATE TABLE %I.network_connections (
+        id SERIAL PRIMARY KEY,
+        fd INTEGER,
+        family VARCHAR(10),
+        type VARCHAR(10),
+        local_ip INET,
+        local_port INTEGER,
+        remote_ip INET,
+        remote_port INTEGER,
+        status VARCHAR(20),
+        pid INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )', schema_name);
+    
+    EXECUTE format('CREATE TABLE %I.system_info (
+        id SERIAL PRIMARY KEY,
+        hostname VARCHAR(255),
+        platform VARCHAR(100),
+        platform_release VARCHAR(100),
+        platform_version VARCHAR(255),
+        architecture VARCHAR(50),
+        processor VARCHAR(255),
+        cpu_count INTEGER,
+        memory_total BIGINT,
+        memory_available BIGINT,
+        memory_percent DECIMAL(5,2),
+        disk_usage_total BIGINT,
+        disk_usage_used BIGINT,
+        disk_usage_free BIGINT,
+        boot_time TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )', schema_name);
+    
+    EXECUTE format('CREATE TABLE %I.user_accounts (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(100) NOT NULL,
+        user_id INTEGER,
+        group_id INTEGER,
+        user_type VARCHAR(50),
+        home_directory VARCHAR(500),
+        shell VARCHAR(100),
+        last_login TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )', schema_name);
+    
+    EXECUTE format('CREATE TABLE %I.auth_logs (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMP,
+        username VARCHAR(100),
+        event_type VARCHAR(50),
+        source_ip INET,
+        status VARCHAR(20),
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )', schema_name);
+    
+    EXECUTE format('CREATE TABLE %I.file_system (
+        id SERIAL PRIMARY KEY,
+        path TEXT NOT NULL,
+        file_type VARCHAR(20),
+        size_bytes BIGINT,
+        permissions VARCHAR(20),
+        owner_user VARCHAR(100),
+        owner_group VARCHAR(100),
+        created_time TIMESTAMP,
+        modified_time TIMESTAMP,
+        accessed_time TIMESTAMP,
+        is_hidden BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )', schema_name);
     
     RETURN TRUE;
 EXCEPTION

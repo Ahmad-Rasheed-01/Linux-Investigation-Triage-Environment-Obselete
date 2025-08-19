@@ -18,15 +18,15 @@ class Config:
     # Flask settings
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
-    # Database settings - SQLite for development, PostgreSQL for production
+    # Database settings - PostgreSQL only (no SQLite fallback)
     POSTGRES_USER = os.environ.get('POSTGRES_USER') or 'postgres'
     POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD') or 'password'
     POSTGRES_HOST = os.environ.get('POSTGRES_HOST') or 'localhost'
     POSTGRES_PORT = os.environ.get('POSTGRES_PORT') or '5432'
     POSTGRES_DB = os.environ.get('POSTGRES_DB') or 'lite_forensics'
     
-    # Use SQLite for development if PostgreSQL is not available
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.join(basedir, "lite_dev.db")}'
+    # Force PostgreSQL usage - construct DATABASE_URL from components
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {

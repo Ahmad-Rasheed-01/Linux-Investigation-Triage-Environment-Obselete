@@ -31,7 +31,18 @@ class JSONIngestionProcessor:
             'fileSystem': 'file_system',
             'networkInterfaces': 'network_interfaces',
             'mountedFilesystems': 'mounted_filesystems',
-            'environmentVariables': 'environment_variables'
+            'environmentVariables': 'environment_variables',
+            # New artifact types
+            'arpCache': 'arp_cache',
+            'blockDevices': 'block_devices',
+            'boot': 'boot_info',
+            'browsingHistory_data': 'browsing_history',
+            'btmp_logs': 'btmp_logs',
+            'cifsMounts': 'cifs_mounts',
+            'collection_metadata': 'collection_metadata',
+            'connectionTracking': 'connection_tracking',
+            'cpuInformation': 'cpu_information',
+            'criticalFiles': 'critical_files'
         }
     
     def process_file(self, file_path: str, case_uuid: str, filename: str) -> Tuple[bool, str, Dict[str, Any]]:
@@ -121,6 +132,8 @@ class JSONIngestionProcessor:
         
         if 'collection_summary' in filename_lower:
             return 'collection_summary'
+        elif 'collection_metadata' in filename_lower:
+            return 'collection_metadata'
         elif 'useraccounts' in filename_lower or 'user_accounts' in filename_lower:
             return 'userAccounts'
         elif 'processes' in filename_lower:
@@ -131,6 +144,8 @@ class JSONIngestionProcessor:
             return 'systemdServices'
         elif 'auth' in filename_lower and 'log' in filename_lower:
             return 'authLogs'
+        elif 'browsinghistory_data' in filename_lower:
+            return 'browsingHistory_data'
         elif 'browsing' in filename_lower or 'history' in filename_lower:
             return 'browsingHistory'
         elif 'firewall' in filename_lower:
@@ -149,6 +164,23 @@ class JSONIngestionProcessor:
             return 'mountedFilesystems'
         elif 'environment' in filename_lower or 'env' in filename_lower:
             return 'environmentVariables'
+        # New artifact types
+        elif 'arpcache' in filename_lower or 'arp_cache' in filename_lower:
+            return 'arpCache'
+        elif 'blockdevices' in filename_lower or 'block_devices' in filename_lower:
+            return 'blockDevices'
+        elif 'boot' in filename_lower and '.json' in filename_lower:
+            return 'boot'
+        elif 'btmp' in filename_lower and 'log' in filename_lower:
+            return 'btmp_logs'
+        elif 'cifsmounts' in filename_lower or 'cifs_mounts' in filename_lower:
+            return 'cifsMounts'
+        elif 'connectiontracking' in filename_lower or 'connection_tracking' in filename_lower:
+            return 'connectionTracking'
+        elif 'cpuinformation' in filename_lower or 'cpu_information' in filename_lower or 'cpu' in filename_lower:
+            return 'cpuInformation'
+        elif 'criticalfiles' in filename_lower or 'critical_files' in filename_lower:
+            return 'criticalFiles'
         
         # Try to determine from data structure
         if isinstance(data, dict):
@@ -188,6 +220,10 @@ class JSONIngestionProcessor:
                 return self._process_collection_summary(data, schema_name, table_name, stats)
             elif artifact_type == 'firewallRules':
                 return self._process_firewall_rules(data, schema_name, table_name, stats)
+            elif artifact_type in ['arpCache', 'blockDevices', 'boot', 'browsingHistory_data', 
+                                 'btmp_logs', 'cifsMounts', 'collection_metadata', 
+                                 'connectionTracking', 'cpuInformation', 'criticalFiles']:
+                return self._process_structured_data(data, schema_name, table_name, stats, artifact_type)
             else:
                 return self._process_list_data(data, schema_name, table_name, stats)
                 
@@ -229,6 +265,52 @@ class JSONIngestionProcessor:
         except Exception as e:
             stats['errors'] = 1
             return False, f"Error processing collection summary: {str(e)}", stats
+    
+    def _process_structured_data(self, data: Any, schema_name: str, table_name: str, 
+                               stats: Dict, artifact_type: str) -> Tuple[bool, str, Dict]:
+        """
+        Process structured data for various artifact types.
+        """
+        try:
+            if isinstance(data, dict):
+                # Handle dictionary-based artifacts
+                record = self._prepare_record_for_insertion(data)
+                record['created_at'] = datetime.utcnow()
+                record['artifact_type'] = artifact_type
+                
+                success = self._insert_record(schema_name, table_name, record)
+                if success:
+                    stats['inserted_records'] = 1
+                    stats['total_records'] = 1
+                    return True, f"{artifact_type} processed successfully", stats
+                else:
+                    stats['errors'] = 1
+                    return False, f"Failed to insert {artifact_type}", stats
+            
+            elif isinstance(data, list):
+                # Handle list-based artifacts
+                return self._process_list_data(data, schema_name, table_name, stats)
+            
+            else:
+                # Handle other data types by converting to string
+                record = {
+                    'content': str(data),
+                    'artifact_type': artifact_type,
+                    'created_at': datetime.utcnow()
+                }
+                
+                success = self._insert_record(schema_name, table_name, record)
+                if success:
+                    stats['inserted_records'] = 1
+                    stats['total_records'] = 1
+                    return True, f"{artifact_type} processed successfully", stats
+                else:
+                    stats['errors'] = 1
+                    return False, f"Failed to insert {artifact_type}", stats
+                    
+        except Exception as e:
+            stats['errors'] = 1
+            return False, f"Error processing {artifact_type}: {str(e)}", stats
     
     def _process_firewall_rules(self, data: Dict, schema_name: str, 
                               table_name: str, stats: Dict) -> Tuple[bool, str, Dict]:
@@ -343,11 +425,71 @@ class JSONIngestionProcessor:
         
         return prepared
     
+    def _ensure_table_exists(self, schema_name: str, table_name: str, record: Dict) -> bool:
+        """
+        Ensure the table exists with appropriate columns for the record.
+        """
+        try:
+            # Check if table exists
+            check_query = f"""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = '{schema_name}' 
+                    AND table_name = '{table_name}'
+                )
+            """
+            
+            result = db.session.execute(text(check_query)).scalar()
+            
+            if not result:
+                # Create table with columns based on record structure
+                columns_def = []
+                for key, value in record.items():
+                    if key == 'id':
+                        columns_def.append('id SERIAL PRIMARY KEY')
+                    elif key == 'created_at':
+                        columns_def.append('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                    elif isinstance(value, bool):
+                        columns_def.append(f'{key} BOOLEAN')
+                    elif isinstance(value, int):
+                        columns_def.append(f'{key} INTEGER')
+                    elif isinstance(value, float):
+                        columns_def.append(f'{key} FLOAT')
+                    else:
+                        columns_def.append(f'{key} TEXT')
+                
+                # Add id and created_at if not present
+                if 'id' not in record:
+                    columns_def.insert(0, 'id SERIAL PRIMARY KEY')
+                if 'created_at' not in record:
+                    columns_def.append('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                
+                create_query = f"""
+                    CREATE TABLE {schema_name}.{table_name} (
+                        {', '.join(columns_def)}
+                    )
+                """
+                
+                db.session.execute(text(create_query))
+                db.session.commit()
+                logger.info(f"Created table {schema_name}.{table_name}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error ensuring table exists {schema_name}.{table_name}: {str(e)}")
+            db.session.rollback()
+            return False
+    
     def _insert_record(self, schema_name: str, table_name: str, record: Dict) -> bool:
         """
         Insert a single record into the specified table.
         """
         try:
+            # Ensure table exists first
+            if not self._ensure_table_exists(schema_name, table_name, record):
+                return False
+            
             # Build column names and placeholders
             columns = list(record.keys())
             placeholders = [f":{col}" for col in columns]
@@ -380,8 +522,14 @@ class JSONIngestionProcessor:
         Log the ingestion result to the database.
         """
         try:
+            # Get case ID from UUID
+            case = Case.query.filter_by(case_uuid=case_uuid).first()
+            if not case:
+                logger.error(f"Case with UUID {case_uuid} not found for logging")
+                return
+                
             log_entry = IngestionLog(
-                case_uuid=case_uuid,
+                case_id=case.id,
                 filename=filename,
                 file_size=file_size,
                 artifact_type=artifact_type,

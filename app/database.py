@@ -25,16 +25,45 @@ def init_db():
             with open(schema_file, 'r', encoding='utf-8') as f:
                 schema_sql = f.read()
             
-            # Split the SQL file into individual statements
-            statements = [stmt.strip() for stmt in schema_sql.split(';') if stmt.strip()]
+            # Split the SQL file into individual statements, handling PostgreSQL functions
+            statements = []
+            current_statement = ""
+            in_function = False
+            
+            for line in schema_sql.split('\n'):
+                line = line.strip()
+                if not line or line.startswith('--'):
+                    continue
+                    
+                current_statement += line + '\n'
+                
+                # Check if we're entering a function definition
+                if 'CREATE OR REPLACE FUNCTION' in line.upper():
+                    in_function = True
+                
+                # Check if we're ending a function definition
+                if in_function and line.endswith('$$ LANGUAGE plpgsql;'):
+                    in_function = False
+                    statements.append(current_statement.strip())
+                    current_statement = ""
+                elif not in_function and line.endswith(';'):
+                    statements.append(current_statement.strip())
+                    current_statement = ""
+            
+            # Add any remaining statement
+            if current_statement.strip():
+                statements.append(current_statement.strip())
             
             for statement in statements:
                 if statement:
                     try:
+                        logging.info(f"Executing SQL statement: {statement[:100]}...")
                         db.session.execute(text(statement))
+                        logging.info("Statement executed successfully")
                     except SQLAlchemyError as e:
                         # Log the error but continue with other statements
-                        logging.warning(f"Error executing SQL statement: {e}")
+                        logging.error(f"Error executing SQL statement: {e}")
+                        logging.error(f"Failed statement: {statement}")
                         continue
             
             db.session.commit()
@@ -47,12 +76,9 @@ def init_db():
         db.session.rollback()
         raise
 
-def create_case_schema(case_name):
+def create_case_schema(schema_name):
     """Create a new schema for a forensic case"""
     try:
-        # Sanitize case name for use as schema name
-        schema_name = f"case_{case_name.lower().replace(' ', '_').replace('-', '_')}"
-        
         # Call the PostgreSQL function to create case schema
         result = db.session.execute(
             text("SELECT create_case_schema(:schema_name)"),
@@ -63,16 +89,16 @@ def create_case_schema(case_name):
         
         success = result.scalar()
         if success:
-            logging.info(f"Created schema for case: {case_name} (schema: {schema_name})")
-            return schema_name
+            logging.info(f"Created schema: {schema_name}")
+            return True
         else:
-            logging.error(f"Failed to create schema for case: {case_name}")
-            return None
+            logging.error(f"Failed to create schema: {schema_name}")
+            return False
             
     except Exception as e:
         logging.error(f"Error creating case schema: {e}")
         db.session.rollback()
-        return None
+        return False
 
 def drop_case_schema(schema_name):
     """Drop a case schema and all its data"""
@@ -148,12 +174,25 @@ def execute_case_query(schema_name, query, params=None):
         raise
 
 def check_db_connection():
-    """Check if database connection is working"""
+    """Check if PostgreSQL database connection is working"""
     try:
-        # Simple query to test connection
-        result = db.session.execute(text("SELECT 1"))
-        result.scalar()
+        # Test PostgreSQL connection with version check
+        result = db.session.execute(text("SELECT version()"))
+        version_info = result.scalar()
+        
+        # Verify it's PostgreSQL
+        if not version_info or 'PostgreSQL' not in version_info:
+            logging.error(f"Expected PostgreSQL but got: {version_info}")
+            return False
+            
+        logging.info(f"PostgreSQL connection successful: {version_info}")
         return True
+        
     except Exception as e:
-        logging.error(f"Database connection check failed: {e}")
+        logging.error(f"PostgreSQL connection check failed: {e}")
+        logging.error("Please ensure:")
+        logging.error("1. PostgreSQL service is running")
+        logging.error("2. Database credentials are correct")
+        logging.error("3. Database 'lite_forensics' exists")
+        logging.error("4. User has proper permissions")
         return False

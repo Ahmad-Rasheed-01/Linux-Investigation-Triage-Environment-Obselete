@@ -17,6 +17,7 @@ from datetime import datetime
 import os
 import uuid
 import logging
+from uuid import UUID
 
 cases_bp = Blueprint('cases', __name__)
 
@@ -72,11 +73,15 @@ def create_case():
     )
     
     try:
+        # Log form data for debugging
+        current_app.logger.info(f"Form data received: {dict(request.form)}")
+        current_app.logger.info(f"Files received: {[f.filename for f in request.files.getlist('artifact_files')]}")
+        
         # Get form data (AJAX requests can still send FormData with files)
         case_name = request.form.get('case_name', '').strip()
         case_number = request.form.get('case_number', '').strip()
-        description = request.form.get('description', '').strip()
-        investigator = request.form.get('investigator', '').strip()
+        description = request.form.get('case_description', '').strip()  # Form uses 'case_description'
+        investigator = request.form.get('investigator_name', '').strip()  # Form uses 'investigator_name'
         evidence_source = request.form.get('evidence_source', '').strip()
         case_priority = request.form.get('case_priority', 'medium')
         collection_date_str = request.form.get('collection_date', '')
@@ -84,44 +89,56 @@ def create_case():
         # Get uploaded files
         uploaded_files = request.files.getlist('artifact_files')
         
+        current_app.logger.info(f"Parsed data - case_name: '{case_name}', investigator: '{investigator}'")
+        
         # Validate required fields
         if not case_name or not investigator:
             error_msg = 'Case name and investigator are required'
+            current_app.logger.warning(f"Validation failed: case_name='{case_name}', investigator='{investigator}'")
             if is_ajax:
                 return jsonify({'success': False, 'message': error_msg}), 400
             flash(error_msg, 'error')
             return render_template('cases/create.html')
         
         # Check if case name already exists
-        if Case.query.filter_by(case_name=case_name).first():
+        existing_case = Case.query.filter_by(case_name=case_name).first()
+        if existing_case:
             error_msg = 'A case with this name already exists'
+            current_app.logger.warning(f"Case name conflict: '{case_name}' already exists")
             if is_ajax:
                 return jsonify({'success': False, 'message': error_msg}), 400
             flash(error_msg, 'error')
             return render_template('cases/create.html')
         
+        current_app.logger.info(f"Validation passed, creating case record...")
+        
         # Parse collection date
         collection_date = None
         if collection_date_str:
+            current_app.logger.info(f"Parsing collection date: '{collection_date_str}'")
             try:
-                collection_date = datetime.strptime(collection_date_str, '%Y-%m-%d')
+                # Try datetime-local format first (from HTML5 input)
+                collection_date = datetime.strptime(collection_date_str, '%Y-%m-%dT%H:%M')
             except ValueError:
-                error_msg = 'Invalid collection date format'
-                if is_ajax:
-                    return jsonify({'success': False, 'message': error_msg}), 400
-                flash(error_msg, 'error')
-                return render_template('cases/create.html')
+                try:
+                    # Fallback to date-only format
+                    collection_date = datetime.strptime(collection_date_str, '%Y-%m-%d')
+                except ValueError:
+                    current_app.logger.error(f"Invalid date format: '{collection_date_str}'")
+                    error_msg = 'Invalid collection date format'
+                    if is_ajax:
+                        return jsonify({'success': False, 'message': error_msg}), 400
+                    flash(error_msg, 'error')
+                    return render_template('cases/create.html')
+            current_app.logger.info(f"Parsed collection date: {collection_date}")
         
-        # Create case schema first
-        schema_name = create_case_schema(case_name)
-        if not schema_name:
-            error_msg = 'Failed to create database schema for case'
-            if is_ajax:
-                return jsonify({'success': False, 'message': error_msg}), 500
-            flash(error_msg, 'error')
-            return render_template('cases/create.html')
+        # Generate a temporary UUID for schema name
+        import uuid
+        temp_uuid = uuid.uuid4()
+        temp_schema_name = f"case_{str(temp_uuid).replace('-', '_')}"
         
-        # Create case record
+        # Create case record with schema name
+        current_app.logger.info(f"Creating Case object...")
         case = Case(
             case_name=case_name,
             case_number=case_number if case_number else None,
@@ -130,12 +147,31 @@ def create_case():
             evidence_source=evidence_source if evidence_source else None,
             collection_date=collection_date,
             case_priority=case_priority,
-            schema_name=schema_name,
-            status='active'
+            status='active',
+            schema_name=temp_schema_name  # Set schema name immediately
         )
         
+        current_app.logger.info(f"Case UUID: {case.case_uuid}, Schema name: {case.schema_name}")
+        
+        # Add case to session
         db.session.add(case)
+        
+        # Create case schema using the schema name
+        current_app.logger.info(f"Creating case schema: {case.schema_name}")
+        schema_success = create_case_schema(case.schema_name)
+        if not schema_success:
+            current_app.logger.error(f"Failed to create schema: {case.schema_name}")
+            db.session.rollback()
+            error_msg = 'Failed to create database schema for case'
+            if is_ajax:
+                return jsonify({'success': False, 'message': error_msg}), 500
+            flash(error_msg, 'error')
+            return render_template('cases/create.html')
+        
+        # Commit the transaction
+        current_app.logger.info(f"Committing case creation...")
         db.session.commit()
+        current_app.logger.info(f"Case created successfully with ID: {case.id}")
         
         current_app.logger.info(f"Created new case: {case_name} (ID: {case.id})")
         
@@ -193,11 +229,13 @@ def create_case():
         flash(error_msg, 'error')
         return render_template('cases/create.html')
 
-@cases_bp.route('/<int:case_id>')
+@cases_bp.route('/<case_id>')
 def view_case(case_id):
     """View case details and dashboard"""
     try:
-        case = Case.query.get_or_404(case_id)
+        # Convert string UUID to UUID object
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         # Get case tables and their row counts
         tables = get_case_tables(case.schema_name)
@@ -208,31 +246,46 @@ def view_case(case_id):
             table_stats[table] = row_count
         
         # Get recent ingestion logs for this case
-        recent_logs = IngestionLog.query.filter_by(case_id=case_id).order_by(
+        recent_logs = IngestionLog.query.filter_by(case_id=case_uuid).order_by(
             IngestionLog.started_at.desc()
         ).limit(10).all()
         
         # Calculate case statistics
         total_records = sum(table_stats.values())
         
-        case_data = {
-            'case': case.to_dict(),
-            'table_stats': table_stats,
-            'total_records': total_records,
-            'recent_logs': [log.to_dict() for log in recent_logs]
+        # Calculate ingestion statistics
+        all_logs = IngestionLog.query.filter_by(case_id=case_uuid).all()
+        successful_ingestions = len([log for log in all_logs if log.status == 'completed'])
+        failed_ingestions = len([log for log in all_logs if log.status == 'failed'])
+        total_files = len(all_logs)
+        
+        # Calculate total data size (approximate based on records)
+        total_data_size_mb = round(total_records * 0.001, 2)  # Rough estimate
+        
+        stats = {
+            'total_files': total_files,
+            'successful_ingestions': successful_ingestions,
+            'failed_ingestions': failed_ingestions,
+            'total_data_size_mb': total_data_size_mb
         }
         
-        return render_template('cases/view.html', data=case_data)
+        return render_template('cases/view.html', 
+                             case=case,
+                             table_stats=table_stats,
+                             total_records=total_records,
+                             recent_logs=recent_logs,
+                             stats=stats)
         
     except Exception as e:
         current_app.logger.error(f"Error viewing case {case_id}: {e}")
         flash('Error loading case details', 'error')
         return redirect(url_for('cases.list_cases'))
 
-@cases_bp.route('/<int:case_id>/edit', methods=['GET', 'POST'])
+@cases_bp.route('/<case_id>/edit', methods=['GET', 'POST'])
 def edit_case(case_id):
     """Edit case details"""
-    case = Case.query.get_or_404(case_id)
+    case_uuid = UUID(case_id)
+    case = Case.query.get_or_404(case_uuid)
     
     if request.method == 'GET':
         return render_template('cases/edit.html', case=case)
@@ -270,11 +323,12 @@ def edit_case(case_id):
         flash('Error updating case', 'error')
         return render_template('cases/edit.html', case=case)
 
-@cases_bp.route('/<int:case_id>/status', methods=['POST'])
+@cases_bp.route('/<case_id>/status', methods=['POST'])
 def update_case_status(case_id):
     """Update case status (activate/deactivate/close)"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         new_status = request.json.get('status')
         
         if new_status not in ['active', 'inactive', 'closed']:
@@ -298,11 +352,12 @@ def update_case_status(case_id):
         db.session.rollback()
         return jsonify({'error': 'Failed to update case status'}), 500
 
-@cases_bp.route('/<int:case_id>/delete', methods=['POST'])
+@cases_bp.route('/<case_id>/delete', methods=['POST'])
 def delete_case(case_id):
     """Delete a case and its schema"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         schema_name = case.schema_name
         case_name = case.case_name
         
@@ -329,10 +384,11 @@ def delete_case(case_id):
         flash('Error deleting case', 'error')
         return redirect(url_for('cases.view_case', case_id=case_id))
 
-@cases_bp.route('/<int:case_id>/upload', methods=['GET', 'POST'])
+@cases_bp.route('/<case_id>/upload', methods=['GET', 'POST'])
 def upload_artifacts(case_id):
     """Upload JSON artifact files to a case"""
-    case = Case.query.get_or_404(case_id)
+    case_uuid = UUID(case_id)
+    case = Case.query.get_or_404(case_uuid)
     
     if request.method == 'GET':
         return render_template('cases/upload.html', case=case)

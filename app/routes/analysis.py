@@ -12,6 +12,7 @@ from app.models import Case
 from datetime import datetime, timedelta
 import logging
 import json
+from uuid import UUID
 
 analysis_bp = Blueprint('analysis', __name__)
 
@@ -89,14 +90,29 @@ ARTIFACT_CATEGORIES = {
     }
 }
 
-@analysis_bp.route('/<int:case_id>')
+@analysis_bp.route('/<case_id>')
 def analysis_home(case_id):
     """Analysis home page with navigation"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         # Get available tables for this case
         available_tables = get_case_tables(case.schema_name)
+        
+        # Calculate table statistics
+        total_records = 0
+        for table in available_tables:
+            try:
+                count = get_table_row_count(case.schema_name, table)
+                total_records += count
+            except Exception:
+                pass  # Skip tables that can't be counted
+        
+        table_stats = {
+            'total_tables': len(available_tables),
+            'total_records': total_records
+        }
         
         # Filter categories based on available tables
         available_categories = {}
@@ -107,18 +123,20 @@ def analysis_home(case_id):
         
         return render_template('analysis/home.html', 
                              case=case, 
-                             categories=available_categories)
+                             categories=available_categories,
+                             table_stats=table_stats)
         
     except Exception as e:
         current_app.logger.error(f"Error loading analysis page for case {case_id}: {e}")
         return render_template('errors/500.html'), 500
 
-@analysis_bp.route('/<int:case_id>/<category>')
-@analysis_bp.route('/<int:case_id>/<category>/<subcategory>')
+@analysis_bp.route('/<case_id>/<category>')
+@analysis_bp.route('/<case_id>/<category>/<subcategory>')
 def view_category(case_id, category, subcategory=None):
     """View specific artifact category or subcategory"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         if category not in ARTIFACT_CATEGORIES:
             return render_template('errors/404.html'), 404
@@ -186,11 +204,12 @@ def view_category(case_id, category, subcategory=None):
         current_app.logger.error(f"Error viewing category {category} for case {case_id}: {e}")
         return render_template('errors/500.html'), 500
 
-@analysis_bp.route('/api/<int:case_id>/<category>/data')
+@analysis_bp.route('/api/<case_id>/<category>/data')
 def get_category_data_api(case_id, category):
     """API endpoint for category data (for AJAX/DataTables)"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         if category not in ARTIFACT_CATEGORIES:
             return jsonify({'error': 'Invalid category'}), 400
@@ -230,11 +249,12 @@ def get_category_data_api(case_id, category):
         current_app.logger.error(f"Error getting category data API: {e}")
         return jsonify({'error': 'Failed to load data'}), 500
 
-@analysis_bp.route('/api/<int:case_id>/search')
+@analysis_bp.route('/api/<case_id>/search')
 def search_artifacts(case_id):
     """Global search across all artifact types"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         query = request.args.get('q', '').strip()
         
         if not query:

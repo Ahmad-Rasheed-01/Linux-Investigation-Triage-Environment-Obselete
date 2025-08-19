@@ -11,6 +11,7 @@ from app.database import db, execute_case_query, get_case_tables, get_table_row_
 from app.models import Case, IngestionLog
 from datetime import datetime, timedelta
 import logging
+from uuid import UUID
 
 api_bp = Blueprint('api', __name__)
 
@@ -47,11 +48,12 @@ def get_cases():
         current_app.logger.error(f"Error getting cases via API: {e}")
         return jsonify({'error': 'Failed to retrieve cases'}), 500
 
-@api_bp.route('/cases/<int:case_id>', methods=['GET'])
+@api_bp.route('/cases/<case_id>', methods=['GET'])
 def get_case(case_id):
     """Get specific case details"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         # Get table statistics
         tables = get_case_tables(case.schema_name)
@@ -71,11 +73,12 @@ def get_case(case_id):
         current_app.logger.error(f"Error getting case {case_id} via API: {e}")
         return jsonify({'error': 'Failed to retrieve case'}), 500
 
-@api_bp.route('/cases/<int:case_id>/artifacts/<table_name>', methods=['GET'])
+@api_bp.route('/cases/<case_id>/artifacts/<table_name>', methods=['GET'])
 def get_case_artifacts(case_id, table_name):
     """Get artifacts from a specific table in a case"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         # Validate table exists
         available_tables = get_case_tables(case.schema_name)
@@ -140,11 +143,12 @@ def get_case_artifacts(case_id, table_name):
         current_app.logger.error(f"Error getting artifacts for case {case_id}, table {table_name}: {e}")
         return jsonify({'error': 'Failed to retrieve artifacts'}), 500
 
-@api_bp.route('/cases/<int:case_id>/query', methods=['POST'])
+@api_bp.route('/cases/<case_id>/query', methods=['POST'])
 def execute_custom_query(case_id):
     """Execute a custom SQL query on a case schema"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         data = request.get_json()
         if not data or 'query' not in data:
@@ -296,11 +300,12 @@ def get_dashboard_statistics():
         current_app.logger.error(f"Error getting dashboard statistics: {e}")
         return jsonify({'error': 'Failed to get statistics'}), 500
 
-@api_bp.route('/export/case/<int:case_id>', methods=['GET'])
+@api_bp.route('/export/case/<case_id>', methods=['GET'])
 def export_case_data(case_id):
     """Export case data in JSON format"""
     try:
-        case = Case.query.get_or_404(case_id)
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
         
         # Get all tables and their data
         tables = get_case_tables(case.schema_name)

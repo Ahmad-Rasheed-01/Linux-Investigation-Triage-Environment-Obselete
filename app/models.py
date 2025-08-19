@@ -20,7 +20,7 @@ class Case(db.Model):
     """Model for forensic investigation cases"""
     __tablename__ = 'cases'
     
-    id = Column(Integer, primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     case_uuid = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False)
     case_name = Column(String(255), unique=True, nullable=False)
     case_number = Column(String(100), unique=True, nullable=True)
@@ -99,7 +99,7 @@ class IngestionLog(db.Model):
     __tablename__ = 'ingestion_logs'
     
     id = Column(Integer, primary_key=True)
-    case_id = Column(Integer, db.ForeignKey('cases.id'), nullable=False)
+    case_id = Column(UUID(as_uuid=True), db.ForeignKey('cases.id'), nullable=False)
     filename = Column(String(500), nullable=False)
     file_size = Column(Float, nullable=False)  # in MB
     artifact_type = Column(String(100), nullable=False)

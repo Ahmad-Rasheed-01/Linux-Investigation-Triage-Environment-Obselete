@@ -50,14 +50,14 @@ def index():
         # Get monthly case creation trend (last 6 months)
         six_months_ago = datetime.utcnow() - timedelta(days=180)
         
-        # SQLite-compatible date grouping
+        # PostgreSQL-compatible date grouping
         monthly_cases = db.session.query(
-            func.strftime('%Y-%m', Case.created_at).label('month'),
+            func.to_char(Case.created_at, 'YYYY-MM').label('month'),
             func.count(Case.id).label('count')
         ).filter(
             Case.created_at >= six_months_ago
         ).group_by(
-            func.strftime('%Y-%m', Case.created_at)
+            func.to_char(Case.created_at, 'YYYY-MM')
         ).order_by('month').all()
         
         # Prepare data for template
@@ -151,14 +151,14 @@ def dashboard_stats_api():
         # Get monthly case creation trend (last 6 months)
         six_months_ago = datetime.utcnow() - timedelta(days=180)
         
-        # SQLite-compatible date grouping
+        # PostgreSQL-compatible date grouping
         monthly_cases = db.session.query(
-            func.strftime('%Y-%m', Case.created_at).label('month'),
+            func.to_char(Case.created_at, 'YYYY-MM').label('month'),
             func.count(Case.id).label('count')
         ).filter(
             Case.created_at >= six_months_ago
         ).group_by(
-            func.strftime('%Y-%m', Case.created_at)
+            func.to_char(Case.created_at, 'YYYY-MM')
         ).order_by('month').all()
         
         stats = {
