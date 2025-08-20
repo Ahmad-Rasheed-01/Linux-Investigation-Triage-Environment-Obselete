@@ -245,39 +245,19 @@ def view_case(case_id):
             row_count = get_table_row_count(case.schema_name, table)
             table_stats[table] = row_count
         
-        # Get recent ingestion logs
-        recent_logs = IngestionLog.query.filter_by(case_id=case.id).order_by(
+        # Get all ingestion logs for this case (DataTables will handle pagination)
+        ingestion_logs = IngestionLog.query.filter_by(case_id=case.id).order_by(
             IngestionLog.started_at.desc()
-        ).limit(10).all()
+        ).all()
         
-        # Debug logging
-        import sys
-        print(f"DEBUG: Case ID: {case.id}, Case UUID: {case.case_uuid}")
-        sys.stdout.flush()
-        print(f"DEBUG: Recent logs count: {len(recent_logs)}")
-        sys.stdout.flush()
-        print(f"DEBUG: All logs query: IngestionLog.query.filter_by(case_id={case.id}).all()")
-        all_logs_debug = IngestionLog.query.filter_by(case_id=case.id).all()
-        print(f"DEBUG: All logs count: {len(all_logs_debug)}")
-        sys.stdout.flush()
-        for log in recent_logs:
-            print(f"DEBUG: Log: {log.filename}, Status: {log.status}, Case ID: {log.case_id}")
-            sys.stdout.flush()
-        
-        # Also check if there are any logs with different case_id format
-        all_logs_in_db = IngestionLog.query.all()
-        print(f"DEBUG: Total logs in database: {len(all_logs_in_db)}")
-        sys.stdout.flush()
-        for log in all_logs_in_db[:5]:  # Show first 5
-            print(f"DEBUG: DB Log: {log.filename}, Case ID: {log.case_id}, Status: {log.status}")
-            sys.stdout.flush()
+
         
         # Calculate case statistics
         total_records = sum(table_stats.values())
         
         # Calculate ingestion statistics
         all_logs = IngestionLog.query.filter_by(case_id=case.id).all()
-        successful_ingestions = len([log for log in all_logs if log.status == 'completed'])
+        successful_ingestions = len([log for log in all_logs if log.status == 'success'])
         failed_ingestions = len([log for log in all_logs if log.status == 'failed'])
         total_files = len(all_logs)
         
@@ -295,7 +275,7 @@ def view_case(case_id):
                              case=case,
                              table_stats=table_stats,
                              total_records=total_records,
-                             ingestion_logs=recent_logs,
+                             ingestion_logs=ingestion_logs,
                              stats=stats)
         
     except Exception as e:
@@ -374,9 +354,47 @@ def update_case_status(case_id):
         db.session.rollback()
         return jsonify({'error': 'Failed to update case status'}), 500
 
+@cases_bp.route('/<case_id>', methods=['DELETE'])
+def delete_case_api(case_id):
+    """Delete a case and its schema (API endpoint)"""
+    try:
+        case_uuid = UUID(case_id)
+        case = Case.query.get_or_404(case_uuid)
+        schema_name = case.schema_name
+        case_name = case.case_name
+        
+        # Delete ingestion logs first (foreign key constraint)
+        IngestionLog.query.filter_by(case_id=case_id).delete()
+        
+        # Delete case record
+        db.session.delete(case)
+        db.session.commit()
+        
+        # Drop the case schema
+        if drop_case_schema(schema_name):
+            current_app.logger.info(f"Deleted case and schema: {case_name}")
+            return jsonify({
+                'success': True,
+                'message': f'Case "{case_name}" deleted successfully'
+            })
+        else:
+            current_app.logger.warning(f"Case deleted but schema cleanup failed: {schema_name}")
+            return jsonify({
+                'success': True,
+                'message': 'Case deleted but database cleanup may be incomplete'
+            })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error deleting case {case_id}: {e}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to delete case'
+        }), 500
+
 @cases_bp.route('/<case_id>/delete', methods=['POST'])
 def delete_case(case_id):
-    """Delete a case and its schema"""
+    """Delete a case and its schema (form submission)"""
     try:
         case_uuid = UUID(case_id)
         case = Case.query.get_or_404(case_uuid)

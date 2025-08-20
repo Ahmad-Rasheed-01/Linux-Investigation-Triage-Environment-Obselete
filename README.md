@@ -4,8 +4,8 @@ A Flask-based web application for digital forensics case management and artifact
 
 ## Features
 
-- **Case Management**: Create and manage digital forensic cases
-- **Artifact Ingestion**: Import and process JSON forensic artifacts
+- **Case Management**: Create and manage traige cases
+- **Artifact Ingestion**: Import and process JSON triage artifacts
 - **Data Visualization**: Interactive dashboards and charts
 - **PostgreSQL Backend**: Robust database for forensic data storage
 - **Web Interface**: User-friendly web-based interface

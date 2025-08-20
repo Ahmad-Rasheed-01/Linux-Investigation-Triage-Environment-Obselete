@@ -48,7 +48,12 @@ class JSONIngestionProcessor:
             'disk_usage': 'disk_usage',
             'fdisk': 'fdisk_info',
             'filesystemStats': 'filesystem_stats',
-            'filesystemTypes': 'filesystem_types'
+            'filesystemTypes': 'filesystem_types',
+            'groupAccounts': 'group_accounts',
+            'homeDirectories': 'home_directories',
+            'installRecords': 'install_records',
+            'kern': 'kern_logs',
+            'kernel_modules': 'kernel_modules'
         }
     
     def process_file(self, file_path: str, case_uuid: str, filename: str) -> Tuple[bool, str, Dict[str, Any]]:
@@ -102,31 +107,19 @@ class JSONIngestionProcessor:
             # Update stats
             stats.update(processed_stats)
             
-            # Log ingestion result
-            self._log_ingestion(
-                case_uuid=case_uuid,
-                filename=filename,
-                file_size=stats['file_size'],
-                artifact_type=artifact_type,
-                status='success' if success else 'failed',
-                records_processed=stats['inserted_records'],
-                error_message=None if success else message
-            )
+            # Note: Ingestion logging is handled by the calling function
+            # to avoid duplicate log entries
             
             return success, message, stats
             
         except json.JSONDecodeError as e:
             error_msg = f"Invalid JSON format: {str(e)}"
             logger.error(f"JSON decode error for {filename}: {error_msg}")
-            self._log_ingestion(case_uuid, filename, stats['file_size'], 
-                              stats['artifact_type'], 'failed', 0, error_msg)
             return False, error_msg, stats
             
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
             logger.error(f"Processing error for {filename}: {error_msg}")
-            self._log_ingestion(case_uuid, filename, stats['file_size'], 
-                              stats['artifact_type'], 'failed', 0, error_msg)
             return False, error_msg, stats
     
     def _determine_artifact_type(self, filename: str, data: Any) -> str:
@@ -197,6 +190,16 @@ class JSONIngestionProcessor:
             return 'disk_usage'
         elif 'fdisk' in filename_lower:
             return 'fdisk'
+        elif 'groupaccounts' in filename_lower or 'group_accounts' in filename_lower:
+            return 'groupAccounts'
+        elif 'homedirectories' in filename_lower or 'home_directories' in filename_lower:
+            return 'homeDirectories'
+        elif 'installrecords' in filename_lower or 'install_records' in filename_lower:
+            return 'installRecords'
+        elif 'kern.json' in filename_lower or 'kern_logs' in filename_lower:
+            return 'kern'
+        elif 'kernel_modules' in filename_lower or 'kernelmodules' in filename_lower:
+            return 'kernel_modules'
         
         # Try to determine from data structure
         if isinstance(data, dict):
@@ -239,7 +242,8 @@ class JSONIngestionProcessor:
             elif artifact_type in ['arpCache', 'arpTableRaw', 'blockDevices', 'boot', 'browsingHistory_data', 
                                  'btmp_logs', 'cifsMounts', 'collection_metadata', 
                                  'connectionTracking', 'cpuInformation', 'criticalFiles',
-                                 'disk_usage', 'fdisk', 'filesystemStats', 'filesystemTypes']:
+                                 'disk_usage', 'fdisk', 'filesystemStats', 'filesystemTypes',
+                                 'groupAccounts', 'homeDirectories', 'installRecords', 'kern', 'kernel_modules']:
                 return self._process_structured_data(data, schema_name, table_name, stats, artifact_type)
             else:
                 return self._process_list_data(data, schema_name, table_name, stats)

@@ -29,7 +29,7 @@ def index():
         
         # Get ingestion statistics
         total_ingestions = IngestionLog.query.count()
-        successful_ingestions = IngestionLog.query.filter_by(status='completed').count()
+        successful_ingestions = IngestionLog.query.filter_by(status='success').count()
         failed_ingestions = IngestionLog.query.filter_by(status='failed').count()
         
         # Get recent ingestion activity (last 24 hours)
@@ -136,7 +136,7 @@ def dashboard_stats_api():
         
         # Get ingestion statistics
         total_ingestions = IngestionLog.query.count()
-        successful_ingestions = IngestionLog.query.filter_by(status='completed').count()
+        successful_ingestions = IngestionLog.query.filter_by(status='success').count()
         failed_ingestions = IngestionLog.query.filter_by(status='failed').count()
         
         # Calculate total data processed

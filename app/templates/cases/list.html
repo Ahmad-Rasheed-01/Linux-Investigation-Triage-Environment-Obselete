@@ -143,14 +143,14 @@
                                         {% if case.status == 'active' %}
                                         <li>
                                             <a class="dropdown-item" href="#" 
-                                               onclick="updateCaseStatus({{ case.id }}, 'inactive')">
+                                               onclick="updateCaseStatus('{{ case.id }}', 'inactive')">
                                                 <i class="fas fa-pause me-2"></i>Deactivate
                                             </a>
                                         </li>
                                         {% elif case.status == 'inactive' %}
                                         <li>
                                             <a class="dropdown-item" href="#" 
-                                               onclick="updateCaseStatus({{ case.id }}, 'active')">
+                                               onclick="updateCaseStatus('{{ case.id }}', 'active')">
                                                 <i class="fas fa-play me-2"></i>Activate
                                             </a>
                                         </li>
@@ -158,7 +158,7 @@
                                         {% if case.status != 'closed' %}
                                         <li>
                                             <a class="dropdown-item" href="#" 
-                                               onclick="updateCaseStatus({{ case.id }}, 'closed')">
+                                               onclick="updateCaseStatus('{{ case.id }}', 'closed')">
                                                 <i class="fas fa-lock me-2"></i>Close Case
                                             </a>
                                         </li>
@@ -166,7 +166,7 @@
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
                                             <a class="dropdown-item text-danger" href="#" 
-                                               onclick="deleteCase({{ case.id }}, '{{ case.case_name }}')">
+                                               onclick="deleteCase('{{ case.id }}', '{{ case.case_name }}')">
                                                 <i class="fas fa-trash me-2"></i>Delete
                                             </a>
                                         </li>
@@ -284,27 +284,34 @@ function updateCaseStatus(caseId, newStatus) {
 
 // Delete case
 function deleteCase(caseId, caseName) {
-    if (confirm(`Are you sure you want to delete the case "${caseName}"? This action cannot be undone.`)) {
-        showLoading();
-        
-        fetch(`/cases/${caseId}/delete`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error deleting case: ' + data.error);
-                hideLoading();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error deleting case');
-            hideLoading();
-        });
+    const confirmMessage = `Are you sure you want to delete the case "${caseName}"?\n\nThis action cannot be undone and will permanently delete all case data including uploaded files and analysis results.`;
+    
+    if (!confirm(confirmMessage)) {
+        return;
     }
+    
+    showLoading();
+    
+    fetch(`/cases/${caseId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            alert(data.message || 'Case deleted successfully');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            alert('Error deleting case: ' + (data.error || data.message || 'Failed to delete case'));
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        alert('Error deleting case: Failed to delete case');
+    });
 }
 
 // Initialize DataTables for better table functionality

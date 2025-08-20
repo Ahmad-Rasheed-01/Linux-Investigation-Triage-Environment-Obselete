@@ -56,7 +56,7 @@ def start_ingestion_task(case_id: int, file_path: str, filename: str, file_size:
         )
         
         # Update log entry with results
-        log_entry.status = 'completed' if success else 'failed'
+        log_entry.status = 'success' if success else 'failed'
         log_entry.artifact_type = stats.get('artifact_type', 'unknown')
         log_entry.records_processed = stats.get('inserted_records', 0)
         log_entry.completed_at = datetime.utcnow()
@@ -103,8 +103,8 @@ def update_case_statistics(case_id: int) -> None:
         # Get ingestion statistics
         ingestion_logs = IngestionLog.query.filter_by(case_id=case_id).all()
         
-        total_artifacts = len([log for log in ingestion_logs if log.status == 'completed'])
-        total_file_size = sum([log.file_size for log in ingestion_logs if log.status == 'completed'])
+        total_artifacts = len([log for log in ingestion_logs if log.status == 'success'])
+        total_file_size = sum([log.file_size for log in ingestion_logs if log.status == 'success'])
         
         # Update case
         case.total_artifacts = total_artifacts
@@ -152,11 +152,11 @@ def get_ingestion_status(case_id: int = None) -> Dict[str, Any]:
         
         stats = {
             'total': len(logs),
-            'completed': len([log for log in logs if log.status == 'completed']),
+            'success': len([log for log in logs if log.status == 'success']),
             'failed': len([log for log in logs if log.status == 'failed']),
             'pending': len([log for log in logs if log.status in ['pending', 'processing']]),
-            'total_records': sum([log.records_processed for log in logs if log.status == 'completed']),
-            'total_size_mb': sum([log.file_size for log in logs if log.status == 'completed'])
+            'total_records': sum([log.records_processed for log in logs if log.status == 'success']),
+            'total_size_mb': sum([log.file_size for log in logs if log.status == 'success'])
         }
         
         return stats
@@ -219,7 +219,7 @@ def retry_failed_ingestion(log_id: int) -> Tuple[bool, str]:
         )
         
         # Update log entry
-        log_entry.status = 'completed' if success else 'failed'
+        log_entry.status = 'success' if success else 'failed'
         log_entry.artifact_type = stats.get('artifact_type', log_entry.artifact_type)
         log_entry.records_processed = stats.get('inserted_records', 0)
         log_entry.completed_at = datetime.utcnow()

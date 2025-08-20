@@ -777,21 +777,22 @@ function deleteCase(caseUuid, caseName) {
     $.ajax({
         url: `/cases/${caseUuid}`,
         method: 'DELETE',
-        data: {
-            csrf_token: $('meta[name=csrf-token]').attr('content')
-        },
         success: function(response) {
             if (response.success) {
-                showAlert('Case deleted successfully', 'success');
+                showAlert(response.message || 'Case deleted successfully', 'success');
                 setTimeout(() => {
                     window.location.href = '/cases';
                 }, 1500);
             } else {
-                showAlert(response.message || 'Failed to delete case', 'danger');
+                showAlert(response.error || response.message || 'Failed to delete case', 'danger');
             }
         },
-        error: function() {
-            showAlert('Error deleting case', 'danger');
+        error: function(xhr) {
+            let errorMessage = 'Error deleting case';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMessage = xhr.responseJSON.error;
+            }
+            showAlert(errorMessage, 'danger');
         },
         complete: function() {
             hideLoading();
