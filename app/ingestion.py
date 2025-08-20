@@ -53,7 +53,15 @@ class JSONIngestionProcessor:
             'homeDirectories': 'home_directories',
             'installRecords': 'install_records',
             'kern': 'kern_logs',
-            'kernel_modules': 'kernel_modules'
+            'kernel_modules': 'kernel_modules',
+            'faillog_logs': 'faillog_logs',
+            'faillock_logs': 'faillock_logs',
+            'extensions_data': 'extensions_data',
+            'downloads_data': 'downloads_data',
+            'search_history': 'search_history',
+            'triggered_tasks': 'triggered_tasks_data',
+            'system_settings': 'system_settings',
+            'log_files_user_relevant': 'log_files_user_relevant'
         }
     
     def process_file(self, file_path: str, case_uuid: str, filename: str) -> Tuple[bool, str, Dict[str, Any]]:
@@ -165,7 +173,7 @@ class JSONIngestionProcessor:
             return 'networkInterfaces'
         elif 'mount' in filename_lower:
             return 'mountedFilesystems'
-        elif 'environment' in filename_lower or 'env' in filename_lower:
+        elif 'environmentvariables' in filename_lower or 'environment_variables' in filename_lower or 'environment' in filename_lower or 'env' in filename_lower:
             return 'environmentVariables'
         # New artifact types
         elif 'arpcache' in filename_lower or 'arp_cache' in filename_lower:
@@ -200,6 +208,22 @@ class JSONIngestionProcessor:
             return 'kern'
         elif 'kernel_modules' in filename_lower or 'kernelmodules' in filename_lower:
             return 'kernel_modules'
+        elif 'faillog' in filename_lower and 'log' in filename_lower:
+            return 'faillog_logs'
+        elif 'faillock' in filename_lower and 'log' in filename_lower:
+            return 'faillock_logs'
+        elif 'extensions_data' in filename_lower or 'extensionsdata' in filename_lower:
+            return 'extensions_data'
+        elif 'downloads_data' in filename_lower or 'downloadsdata' in filename_lower:
+            return 'downloads_data'
+        elif 'search_history' in filename_lower or 'searchhistory' in filename_lower:
+            return 'search_history'
+        elif 'triggered_tasks' in filename_lower or 'triggeredtasks' in filename_lower:
+            return 'triggered_tasks'
+        elif 'system_settings' in filename_lower or 'systemsettings' in filename_lower:
+            return 'system_settings'
+        elif 'log_files_user_relevant' in filename_lower or 'logfilesuserrelevant' in filename_lower:
+            return 'log_files_user_relevant'
         
         # Try to determine from data structure
         if isinstance(data, dict):
@@ -290,19 +314,24 @@ class JSONIngestionProcessor:
                 return self._process_raw_data(data, schema_name, table_name, stats, artifact_type)
             
             if isinstance(data, dict):
-                # Handle dictionary-based artifacts
-                record = self._prepare_record_for_insertion(data, artifact_type)
-                record['created_at'] = datetime.utcnow()
-                record['artifact_type'] = artifact_type
-                
-                success = self._insert_record(schema_name, table_name, record)
-                if success:
-                    stats['inserted_records'] = 1
-                    stats['total_records'] = 1
-                    return True, f"{artifact_type} processed successfully", stats
+                # Check if the dictionary contains an 'entries' array
+                if 'entries' in data and isinstance(data['entries'], list):
+                    # Process the entries array as list data
+                    return self._process_list_data(data['entries'], schema_name, table_name, stats)
                 else:
-                    stats['errors'] = 1
-                    return False, f"Failed to insert {artifact_type}", stats
+                    # Handle dictionary-based artifacts
+                    record = self._prepare_record_for_insertion(data, artifact_type)
+                    record['created_at'] = datetime.utcnow()
+                    record['artifact_type'] = artifact_type
+                    
+                    success = self._insert_record(schema_name, table_name, record)
+                    if success:
+                        stats['inserted_records'] = 1
+                        stats['total_records'] = 1
+                        return True, f"{artifact_type} processed successfully", stats
+                    else:
+                        stats['errors'] = 1
+                        return False, f"Failed to insert {artifact_type}", stats
             
             elif isinstance(data, list):
                 # Handle list-based artifacts
