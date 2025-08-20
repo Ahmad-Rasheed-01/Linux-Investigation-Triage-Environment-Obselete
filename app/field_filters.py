@@ -13,6 +13,9 @@ FIELD_FILTERS = {
     'audit': {
         'fields': ['timestamp', 'event_type', 'pid', 'uid', 'gid', 'executable', 'command', 'result']
     },
+    'auth': {
+        'fields': ['timestamp', 'event_type', 'user', 'service', 'result', 'source_ip', 'message']
+    },
     'blockDevices': {
         'allowed_fields': ['device_name', 'size_bytes', 'device_type', 'mount_point', 'filesystem', 'model'],
         'raw_data': True
@@ -66,8 +69,7 @@ FIELD_FILTERS = {
         'raw_data': True
     },
     'filesystemStats': {
-        'fields': ['filesystem', 'inodes', 'iused', 'ifree', 'iuse_percent', 'mounted_on'],
-        'raw_data': True
+        'fields': ['filesystem', 'inodes', 'iused', 'ifree', 'iuse_percent', 'mounted_on']
     },
     'filesystemTypes': {
         'fields': ['filesystem_type', 'nodev'],
@@ -90,6 +92,24 @@ FIELD_FILTERS = {
     },
     'kernel_modules': {
         'fields': ['name', 'size', 'used_count', 'used_by']
+    },
+    'faillog_logs': {
+        'fields': ['username', 'port', 'from', 'latest_failure', 'on']
+    },
+    'faillock_logs': {
+        'fields': ['username', 'tty', 'rhost', 'user', 'time']
+    },
+    'dmesg': {
+        'fields': ['timestamp', 'subsystem', 'level', 'message']
+    },
+    'installedPackages': {
+        'fields': ['name', 'version', 'architecture', 'description', 'status']
+    },
+    'audit': {
+        'fields': ['timestamp', 'event_type', 'pid', 'uid', 'gid', 'executable', 'command', 'result']
+    },
+    'detailedConnections': {
+        'fields': ['protocol', 'local_address', 'local_port', 'foreign_address', 'foreign_port', 'state', 'pid', 'process_name']
     }
 }
 

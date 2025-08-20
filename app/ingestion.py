@@ -61,7 +61,16 @@ class JSONIngestionProcessor:
             'search_history': 'search_history',
             'triggered_tasks': 'triggered_tasks_data',
             'system_settings': 'system_settings',
-            'log_files_user_relevant': 'log_files_user_relevant'
+            'log_files_user_relevant': 'log_files_user_relevant',
+            'dnsCache': 'dns_cache',
+            'dmesg': 'dmesg_logs',
+            'development_programming': 'development_programming',
+            'dpkgLogsMetadata': 'dpkg_logs_metadata',
+            'installedPackages': 'installed_packages',
+            # Add missing artifact types
+            'audit': 'audit_logs',
+            'auth': 'auth_logs',
+            'detailedConnections': 'detailed_connections'
         }
     
     def process_file(self, file_path: str, case_uuid: str, filename: str) -> Tuple[bool, str, Dict[str, Any]]:
@@ -171,6 +180,8 @@ class JSONIngestionProcessor:
             return 'fileSystem'
         elif 'interface' in filename_lower:
             return 'networkInterfaces'
+        elif 'cifsmounts' in filename_lower or 'cifs_mounts' in filename_lower:
+            return 'cifsMounts'
         elif 'mount' in filename_lower:
             return 'mountedFilesystems'
         elif 'environmentvariables' in filename_lower or 'environment_variables' in filename_lower or 'environment' in filename_lower or 'env' in filename_lower:
@@ -184,8 +195,6 @@ class JSONIngestionProcessor:
             return 'boot'
         elif 'btmp' in filename_lower and 'log' in filename_lower:
             return 'btmp_logs'
-        elif 'cifsmounts' in filename_lower or 'cifs_mounts' in filename_lower:
-            return 'cifsMounts'
         elif 'connectiontracking' in filename_lower or 'connection_tracking' in filename_lower:
             return 'connectionTracking'
         elif 'cpuinformation' in filename_lower or 'cpu_information' in filename_lower or 'cpu' in filename_lower:
@@ -224,6 +233,22 @@ class JSONIngestionProcessor:
             return 'system_settings'
         elif 'log_files_user_relevant' in filename_lower or 'logfilesuserrelevant' in filename_lower:
             return 'log_files_user_relevant'
+        elif 'dnscache' in filename_lower or 'dns_cache' in filename_lower:
+            return 'dnsCache'
+        elif 'dmesg' in filename_lower:
+            return 'dmesg'
+        elif 'development_programming' in filename_lower or 'developmentprogramming' in filename_lower:
+            return 'development_programming'
+        elif 'dpkglogsmetadata' in filename_lower or 'dpkg_logs_metadata' in filename_lower:
+            return 'dpkgLogsMetadata'
+        elif 'dpkgpackages' in filename_lower or 'dpkg_packages' in filename_lower:
+            return 'installedPackages'
+        elif 'audit.json' in filename_lower or 'audit_logs' in filename_lower:
+            return 'audit'
+        elif 'auth.json' in filename_lower:
+            return 'auth'
+        elif 'detailedconnections' in filename_lower or 'detailed_connections' in filename_lower:
+            return 'detailedConnections'
         
         # Try to determine from data structure
         if isinstance(data, dict):
@@ -267,10 +292,13 @@ class JSONIngestionProcessor:
                                  'btmp_logs', 'cifsMounts', 'collection_metadata', 
                                  'connectionTracking', 'cpuInformation', 'criticalFiles',
                                  'disk_usage', 'fdisk', 'filesystemStats', 'filesystemTypes',
-                                 'groupAccounts', 'homeDirectories', 'installRecords', 'kern', 'kernel_modules']:
+                                 'groupAccounts', 'homeDirectories', 'installRecords', 'kern', 'kernel_modules',
+                                 'dpkgPackages', 'environmentVariables', 'faillog_logs', 'faillock_logs',
+                                 'extensions_data', 'dpkgLogsMetadata', 'dnsCache', 'dmesg', 
+                                 'development_programming', 'installedPackages', 'audit', 'auth', 'detailedConnections']:
                 return self._process_structured_data(data, schema_name, table_name, stats, artifact_type)
             else:
-                return self._process_list_data(data, schema_name, table_name, stats)
+                return self._process_list_data(data, schema_name, table_name, stats, artifact_type)
                 
         except Exception as e:
             error_msg = f"Error processing {artifact_type}: {str(e)}"
@@ -317,7 +345,13 @@ class JSONIngestionProcessor:
                 # Check if the dictionary contains an 'entries' array
                 if 'entries' in data and isinstance(data['entries'], list):
                     # Process the entries array as list data
-                    return self._process_list_data(data['entries'], schema_name, table_name, stats)
+                    return self._process_list_data(data['entries'], schema_name, table_name, stats, artifact_type)
+                # Check if the dictionary contains other array fields that should be processed as lists
+                elif any(isinstance(v, list) for v in data.values() if isinstance(v, list) and len(v) > 0):
+                    # Find the first list field and process it
+                    for key, value in data.items():
+                        if isinstance(value, list) and len(value) > 0:
+                            return self._process_list_data(value, schema_name, table_name, stats, artifact_type)
                 else:
                     # Handle dictionary-based artifacts
                     record = self._prepare_record_for_insertion(data, artifact_type)
@@ -335,7 +369,7 @@ class JSONIngestionProcessor:
             
             elif isinstance(data, list):
                 # Handle list-based artifacts
-                return self._process_list_data(data, schema_name, table_name, stats)
+                return self._process_list_data(data, schema_name, table_name, stats, artifact_type)
             
             else:
                 # Handle other data types by converting to string
@@ -428,7 +462,7 @@ class JSONIngestionProcessor:
             return False, f"Error processing firewall rules: {str(e)}", stats
     
     def _process_list_data(self, data: Any, schema_name: str, 
-                         table_name: str, stats: Dict) -> Tuple[bool, str, Dict]:
+                         table_name: str, stats: Dict, artifact_type: str = None) -> Tuple[bool, str, Dict]:
         """
         Process list-based artifact data.
         """
@@ -446,7 +480,7 @@ class JSONIngestionProcessor:
                         item['created_at'] = datetime.utcnow()
                     
                     # Convert any nested objects to JSON strings
-                    processed_item = self._prepare_record_for_insertion(item, table_name)
+                    processed_item = self._prepare_record_for_insertion(item, artifact_type)
                     
                     if self._insert_record(schema_name, table_name, processed_item):
                         records_inserted += 1
