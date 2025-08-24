@@ -256,7 +256,16 @@
                                         <span class="text-muted">Unknown</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ (log.file_size / 1024 / 1024) | round(2) }} MB</td>
+                                <td>
+                                    {% set size_in_bytes = (log.file_size * 1024 * 1024) | int %}
+                                    {% if size_in_bytes < 1024 %}
+                                        {{ size_in_bytes }} bytes
+                                    {% elif size_in_bytes < 1048576 %}
+                                        {{ (size_in_bytes / 1024) | round(2) }} KB
+                                    {% else %}
+                                        {{ log.file_size | round(2) }} MB
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if log.status == 'completed' %}
                                         <span class="badge bg-success">Completed</span>

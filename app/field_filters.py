@@ -26,6 +26,9 @@ FIELD_FILTERS = {
     'browsingHistory_data': {
         'fields': ['url', 'title', 'visit_count', 'last_visit_time', 'typed_count']
     },
+    'cifsMounts': {
+        'fields': ['device', 'mount_point', 'filesystem', 'options']
+    },
     'collection_metadata': {
         'fields': ['collection_timestamp', 'hostname', 'collection_directory', 'total_sections', 'total_files', 'total_directories']
     },
@@ -82,7 +85,7 @@ FIELD_FILTERS = {
         'fields': ['groupName', 'password', 'gid', 'members', 'groupType']
     },
     'homeDirectories': {
-        'fields': ['username', 'uid', 'gid', 'permissions', 'links', 'owner', 'group', 'size', 'month', 'day', 'time', 'directoryName', 'fullPath', 'isUserDirectory', 'shell', 'exists', 'diskUsage']
+        'fields': ['username', 'uid', 'gid', 'permissions', 'owner', 'home_path', 'exists', 'shell', 'group_name', 'size_bytes', 'timestamp', 'extractor']
     },
     'installRecords': {
         'fields': ['timestamp', 'action', 'package', 'package_name', 'architecture', 'source_file', 'version']
@@ -113,6 +116,53 @@ FIELD_FILTERS = {
     }
 }
 
+# Field mapping for artifacts that need field name transformation
+FIELD_MAPPINGS = {
+    'homeDirectories': {
+        'fullPath': 'home_path',
+        'group': 'group_name',
+        'diskUsage.sizeBytes': 'size_bytes'
+    },
+    'criticalFiles': {
+        'path': 'file_path',
+        'fileSize': 'size',
+        'dateModified': 'modified_time',
+        'metaType': 'file_type'
+    }
+}
+
+def apply_field_mapping(record, artifact_type):
+    """
+    Apply field name mappings for specific artifact types.
+    
+    Args:
+        record (dict): The original record
+        artifact_type (str): The type of artifact being processed
+        
+    Returns:
+        dict: Record with mapped field names
+    """
+    if artifact_type not in FIELD_MAPPINGS:
+        return record
+    
+    mapped_record = record.copy()
+    mappings = FIELD_MAPPINGS[artifact_type]
+    
+    for source_field, target_field in mappings.items():
+        # Handle nested fields like 'diskUsage.sizeBytes'
+        if '.' in source_field:
+            parts = source_field.split('.')
+            if parts[0] in mapped_record and isinstance(mapped_record[parts[0]], dict):
+                if parts[1] in mapped_record[parts[0]]:
+                    mapped_record[target_field] = mapped_record[parts[0]][parts[1]]
+        elif source_field in mapped_record:
+            mapped_record[target_field] = mapped_record[source_field]
+            # Remove the original field if it was mapped
+            if source_field != target_field:
+                mapped_record.pop(source_field, None)
+    
+    return mapped_record
+
 def filter_record_fields(record, artifact_type):
     """
     Filter a record to only include the fields specified in FIELD_FILTERS.
@@ -128,12 +178,15 @@ def filter_record_fields(record, artifact_type):
         # If no filter is defined, return the original record
         return record
     
+    # First apply field mapping if needed
+    mapped_record = apply_field_mapping(record, artifact_type)
+    
     allowed_fields = FIELD_FILTERS[artifact_type].get('allowed_fields', FIELD_FILTERS[artifact_type].get('fields', []))
     filtered_record = {}
     
     for field in allowed_fields:
-        if field in record:
-            filtered_record[field] = record[field]
+        if field in mapped_record:
+            filtered_record[field] = mapped_record[field]
     
     return filtered_record
 

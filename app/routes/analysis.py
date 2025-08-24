@@ -7,7 +7,7 @@ Handles artifact analysis, filtering, and exploration functionality.
 
 from flask import Blueprint, render_template, request, jsonify, current_app
 from sqlalchemy import text, func
-from app.database import db, execute_case_query, get_case_tables
+from app.database import db, execute_case_query, get_case_tables, get_table_row_count
 from app.models import Case
 from datetime import datetime, timedelta
 import logging
